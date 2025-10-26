@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import hashlib
 from pydantic import ValidationError
+from starlette.requests import Request
 
 from app.database import get_db
 from app.dependencies import get_current_active_user
@@ -14,6 +15,8 @@ from app.security import (
 )
 from app.config import settings
 import logging
+
+from fastapi import Response
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -72,32 +75,21 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
+async def login(
+        response: Response,
+        login_data: LoginRequest,
+        db: Session = Depends(get_db)
+):
     try:
-        logger.info(f"Login attempt for email: {login_data.email}")
+        logger.info(f"🔐 Login attempt for email: {login_data.email}")
 
-        # Находим пользователя
+        # Существующая логика аутентификации
         user = get_user_by_email(db, login_data.email)
-        if not user:
-            logger.warning(f"Login failed - user not found: {login_data.email}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password"
-            )
-
-        if not verify_password(login_data.password, user.hashed_password):
-            logger.warning(f"Login failed - incorrect password for: {login_data.email}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password"
-            )
+        if not user or not verify_password(login_data.password, user.hashed_password):
+            raise HTTPException(status_code=401, detail="Incorrect email or password")
 
         if not user.is_active:
-            logger.warning(f"Login failed - inactive user: {login_data.email}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Inactive user"
-            )
+            raise HTTPException(status_code=400, detail="Inactive user")
 
         # Создаем токены
         access_token = create_access_token(data={"sub": user.id, "email": user.email})
@@ -116,37 +108,45 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         db.add(db_refresh_token)
         db.commit()
 
-        logger.info(f"Login successful for: {login_data.email}")
+        # Устанавливаем refresh token в httpOnly cookie
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            secure=False,  # True в production (HTTPS)
+            samesite="lax",
+            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,  # seconds
+            path="/api/auth/"  # Доступен только для auth эндпоинтов
+        )
+
+        logger.info(f"✅ Login successful for: {login_data.email}")
 
         return Token(
             access_token=access_token,
-            refresh_token=refresh_token,
+            token_type="bearer",
             user=user
         )
 
     except Exception as e:
         db.rollback()
-        logger.error(f"Login error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Login failed: {str(e)}"
-        )
+        logger.error(f"💥 Login error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(token_data: RefreshTokenCreate, db: Session = Depends(get_db)):
+async def refresh_token(
+        request: Request,
+        response: Response,
+        db: Session = Depends(get_db)
+):
     try:
-        logger.info("Refresh token request received")
-
-        # Валидация входных данных
-        if not token_data.refresh_token:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Refresh token is required"
-            )
+        # Получаем refresh token из cookie
+        refresh_token = request.cookies.get("refresh_token")
+        if not refresh_token:
+            raise HTTPException(status_code=401, detail="Refresh token missing")
 
         # Находим refresh token в БД
-        token_hash = hash_token(token_data.refresh_token)
+        token_hash = hash_token(refresh_token)
         db_token = db.query(RefreshToken).filter(
             RefreshToken.token_hash == token_hash,
             RefreshToken.revoked == False,
@@ -154,21 +154,12 @@ async def refresh_token(token_data: RefreshTokenCreate, db: Session = Depends(ge
         ).first()
 
         if not db_token:
-            logger.warning("Refresh token not found or invalid")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid refresh token"
-            )
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
 
         user = db_token.user
 
-        # Проверяем, активен ли пользователь
         if not user.is_active:
-            logger.warning(f"Refresh token attempt for inactive user: {user.email}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Inactive user"
-            )
+            raise HTTPException(status_code=400, detail="Inactive user")
 
         # Создаем новые токены
         access_token = create_access_token(data={"sub": user.id, "email": user.email})
@@ -181,70 +172,64 @@ async def refresh_token(token_data: RefreshTokenCreate, db: Session = Depends(ge
 
         db.commit()
 
-        logger.info(f"Token refreshed successfully for user: {user.email}")
+        # 🔥 Устанавливаем новый refresh token в cookie
+        response.set_cookie(
+            key="refresh_token",
+            value=new_refresh_token,
+            httponly=True,
+            secure=False,
+            samesite="lax",
+            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+            path="/api/auth/"
+        )
 
         return Token(
             access_token=access_token,
-            refresh_token=new_refresh_token
+            token_type="bearer",
+            user=user
         )
 
-    except ValidationError as e:
-        db.rollback()
-        logger.error(f"Validation error during token refresh: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Validation error: {str(e)}"
-        )
     except HTTPException:
-        # Пробрасываем уже созданные HTTPException
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Token refresh error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Token refresh failed: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Token refresh failed: {str(e)}")
 
 
 @router.post("/logout")
-async def logout(token_data: RefreshTokenCreate, db: Session = Depends(get_db)):
+async def logout(
+        request: Request,
+        response: Response,
+        db: Session = Depends(get_db)
+):
     try:
-        logger.info("Logout request received")
+        # Получаем refresh token из cookie
+        refresh_token = request.cookies.get("refresh_token")
 
-        # Валидация входных данных
-        if not token_data.refresh_token:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Refresh token is required"
-            )
+        if refresh_token:
+            # Инвалидируем refresh token в БД
+            token_hash = hash_token(refresh_token)
+            db_token = db.query(RefreshToken).filter(
+                RefreshToken.token_hash == token_hash
+            ).first()
 
-        token_hash = hash_token(token_data.refresh_token)
-        db_token = db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
+            if db_token:
+                db_token.revoked = True
+                db.commit()
 
-        if db_token:
-            db_token.revoked = True
-            db.commit()
-            logger.info(f"Refresh token revoked for user: {db_token.user.email}")
-        else:
-            logger.warning("Refresh token not found during logout - might be already revoked")
+        # Удаляем cookie
+        response.delete_cookie(
+            key="refresh_token",
+            path="/api/auth/"
+        )
 
         return {"message": "Successfully logged out"}
 
-    except ValidationError as e:
-        db.rollback()
-        logger.error(f"Validation error during logout: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Validation error: {str(e)}"
-        )
     except Exception as e:
         db.rollback()
         logger.error(f"Logout error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Logout failed: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Logout failed: {str(e)}")
 
 
 @router.get("/me", response_model=UserResponse)

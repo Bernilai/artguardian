@@ -11,7 +11,7 @@ def test_complete_fixed_flow():
     # 1. Регистрация
     print("\n1. Регистрация...")
     register_data = {
-        "email": "complete_test@example.com",
+        "email": "complete_test1@example.com",
         "password": "complete123",
         "name": "Complete Test User"
     }

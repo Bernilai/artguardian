@@ -41,13 +41,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://localhost:3000",
         "http://127.0.0.1:3000",
-        "https://127.0.0.1:3000",
-        "http://localhost:63342",  # ← Добавляем WebStorm сервер
-        "https://localhost:63342",
-        "http://127.0.0.1:63342",
-        "https://127.0.0.1:63342"
+        "http://localhost:63342",
+        "http://127.0.0.1:63342"
     ],
     allow_credentials=True,
     allow_methods=["*"],
