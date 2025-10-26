@@ -1,0 +1,274 @@
+.artifact-card {
+    background: var(--surface);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-1);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    border: 1px solid var(--divider);
+    cursor: pointer;
+    position: relative;
+}
+
+.artifact-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-2);
+    border-color: var(--primary-light);
+}
+
+.artifact-card:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.artifact-card__image-container {
+    position: relative;
+    width: 100%;
+    height: 200px;
+    overflow: hidden;
+    background-color: #f8f9fa;
+}
+
+.artifact-card__image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.artifact-card:hover .artifact-card__image {
+    transform: scale(1.05);
+}
+
+.artifact-card__status {
+    position: absolute;
+    top: var(--spacing-sm);
+    right: var(--spacing-sm);
+    z-index: 2;
+}
+
+.artifact-card__actions {
+    position: absolute;
+    top: var(--spacing-sm);
+    left: var(--spacing-sm);
+    display: flex;
+    gap: var(--spacing-xs);
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.2s ease;
+}
+
+.artifact-card:hover .artifact-card__actions {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.artifact-card__action-btn {
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    border-radius: var(--border-radius-sm);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+}
+
+.artifact-card__action-btn:hover {
+    background: white;
+    transform: scale(1.1);
+}
+
+.artifact-card__content {
+    padding: var(--spacing-md);
+}
+
+.artifact-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--spacing-sm);
+    gap: var(--spacing-sm);
+}
+
+.artifact-card__title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.3;
+    flex: 1;
+}
+
+.artifact-card__inventory {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    background: var(--divider);
+    padding: 2px 6px;
+    border-radius: var(--border-radius-sm);
+    font-family: monospace;
+}
+
+.artifact-card__description {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.4;
+    margin-bottom: var(--spacing-md);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.artifact-card__meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: var(--text-disabled);
+    margin-bottom: var(--spacing-md);
+}
+
+.artifact-card__collection {
+    font-weight: 500;
+}
+
+.artifact-card__date {
+    font-size: 0.75rem;
+}
+
+.artifact-card__defects {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-sm);
+}
+
+.defect-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.7rem;
+    font-weight: 500;
+    gap: 2px;
+    white-space: nowrap;
+}
+
+.defect-tag--crack {
+    background-color: #fff3e0;
+    color: #ef6c00;
+}
+
+.defect-tag--stain {
+    background-color: #e3f2fd;
+    color: #1976d2;
+}
+
+.defect-tag--discoloration {
+    background-color: #f3e5f5;
+    color: #7b1fa2;
+}
+
+.defect-tag--peeling {
+    background-color: #fff8e1;
+    color: #ff8f00;
+}
+
+.defect-tag--deformation {
+    background-color: #fbe9e7;
+    color: #d84315;
+}
+
+.defect-tag--abrasion {
+    background-color: #e0f2f1;
+    color: #00796b;
+}
+
+.defect-tag--corrosion {
+    background-color: #e8eaf6;
+    color: #303f9f;
+}
+
+.defect-tag--break {
+    background-color: #ffebee;
+    color: #c62828;
+}
+
+.defect-tag--other {
+    background-color: #f5f5f5;
+    color: var(--text-secondary);
+}
+
+.defect-tag--more {
+    background-color: var(--divider);
+    color: var(--text-secondary);
+}
+
+/* Стили для разных режимов отображения */
+
+/* Компактный режим */
+.artifact-card--compact {
+    display: flex;
+    height: 120px;
+}
+
+.artifact-card--compact .artifact-card__image-container {
+    width: 120px;
+    height: 120px;
+    flex-shrink: 0;
+}
+
+.artifact-card--compact .artifact-card__content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacing-sm);
+    overflow: hidden;
+}
+
+.artifact-card--compact .artifact-card__description {
+    -webkit-line-clamp: 1;
+    margin-bottom: var(--spacing-sm);
+}
+
+.artifact-card--compact .artifact-card__defects {
+    margin-top: auto;
+}
+
+/* Режим списка */
+.artifact-card--list {
+    display: flex;
+    height: 150px;
+}
+
+.artifact-card--list .artifact-card__image-container {
+    width: 200px;
+    height: 150px;
+    flex-shrink: 0;
+}
+
+.artifact-card--list .artifact-card__content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.artifact-card--list .artifact-card__description {
+    -webkit-line-clamp: 3;
+}
+
+@media (max-width: 768px) {
+    .artifact-card--list {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .artifact-card--list .artifact-card__image-container {
+        width: 100%;
+        height: 200px;
+    }
+}

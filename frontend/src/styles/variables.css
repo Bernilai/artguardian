@@ -1,0 +1,82 @@
+:root {
+    /* Цвета */
+    --primary-color: #1976d2;
+    --primary-dark: #1565c0;
+    --primary-light: #42a5f5;
+
+    --secondary-color: #9c27b0;
+    --success-color: #388e3c;
+    --warning-color: #f57c00;
+    --error-color: #d32f2f;
+
+    --divider: #d0d0d0;
+
+    /* Основные фоны */
+    --background: #f8f9fa;
+    --surface: #ffffff;
+    --surface-elevated: #ffffff;
+    --surface-hover: #f8f9fa;
+
+    /* Цвета для текстов */
+    --text-primary: #1a1a1a;
+    --text-secondary: #666666;
+    --text-on-primary: #ffffff;
+    --text-on-dark: #ffffff;
+    --text-disabled: #8a8a8a;
+
+
+    /* Тени */
+    --shadow-1: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    --shadow-2: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+    --shadow-3: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+
+    /* Размеры */
+    --border-radius: 8px;
+    --border-radius-sm: 4px;
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+
+    /* Утилитарные классы для текста */
+    .text-primary { color: var(--text-primary); }
+    .text-secondary { color: var(--text-secondary); }
+    .text-on-primary { color: var(--text-on-primary); }
+
+    /* Улучшение контраста для всех текстовых элементов */
+    body {
+        color: var(--text-primary);
+        background-color: var(--background);
+    }
+
+    .layout-content {
+        background-color: var(--background);
+    }
+
+    .artifact-card,
+    .dashboard-section,
+    .settings-panel,
+    .analytics-content,
+    .tickets-content {
+        background-color: var(--surface);
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow-1);
+        border: 1px solid var(--divider);
+        margin-bottom: var(--spacing-lg);
+    }
+
+    dashboard-section:hover,
+    artifact-card:hover {
+        box-shadow: var(--shadow-2);
+        transition: box-shadow 0.2s ease;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        color: var(--text-primary);
+    }
+
+    p, span, div {
+        color: var(--text-primary);
+    }
+}

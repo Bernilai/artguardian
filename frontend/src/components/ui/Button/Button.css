@@ -1,0 +1,126 @@
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    border: none;
+    border-radius: var(--border-radius);
+    font-family: inherit;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+.btn:focus {
+    outline: 2px solid var(--primary-light);
+    outline-offset: 2px;
+}
+
+/* Варианты */
+.btn--primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.btn--primary:hover:not(:disabled) {
+    background-color: var(--primary-dark);
+    transform: translateY(-1px);
+}
+
+.btn--secondary {
+    background-color: var(--surface);
+    color: var(--text-primary);
+    border: 1px solid var(--divider);
+}
+
+.btn--secondary:hover:not(:disabled) {
+    background-color: #f8f9fa;
+    border-color: var(--text-disabled);
+}
+
+.btn--outline {
+    background-color: transparent;
+    color: var(--primary-color);
+    border: 1px solid var(--primary-color);
+}
+
+.btn--outline:hover:not(:disabled) {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* Размеры */
+.btn--small {
+    padding: 6px 12px;
+    font-size: 0.875rem;
+    min-height: 32px;
+}
+
+.btn--medium {
+    padding: 8px 16px;
+    font-size: 1rem;
+    min-height: 40px;
+}
+
+.btn--large {
+    padding: 12px 24px;
+    font-size: 1.125rem;
+    min-height: 48px;
+}
+
+/* Иконка */
+.btn__icon {
+    font-size: 1.2em;
+    display: flex;
+    align-items: center;
+}
+
+.btn--icon-only {
+    padding: 8px;
+    aspect-ratio: 1;
+}
+
+.btn--icon-only .btn__icon {
+    margin: 0;
+}
+
+/* Состояние загрузки */
+.btn--loading {
+    color: transparent;
+}
+
+.btn--loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin: -8px 0 0 -8px;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: button-spinner 0.8s linear infinite;
+}
+
+.btn--full-width {
+    width: 100%;
+}
+
+@keyframes button-spinner {
+    from {
+        transform: rotate(0turn);
+    }
+    to {
+        transform: rotate(1turn);
+    }
+}

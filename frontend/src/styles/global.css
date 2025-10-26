@@ -1,0 +1,75 @@
+/* Глобальный сброс стилей */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+/* Убираем стандартные отступы */
+body,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+ul,
+ol,
+li,
+figure,
+figcaption,
+blockquote,
+dl,
+dd {
+    margin: 0;
+    padding: 0;
+}
+
+/* Убираем стандартные стили списков */
+ul,
+ol {
+    list-style: none;
+}
+
+/* Наследование шрифтов для форм */
+input,
+button,
+textarea,
+select {
+    font: inherit;
+}
+
+/* Убираем стандартные стили кнопок */
+button {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+}
+
+/* Убираем стандартные стили ссылок */
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* Изображения адаптивные */
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Скрываем элементы визуально, но оставляем доступными для скринридеров */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}

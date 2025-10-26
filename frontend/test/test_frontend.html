@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frontend-Backend Integration Test</title>
+</head>
+<body>
+<h1>Frontend-Backend Integration Test</h1>
+
+<div>
+    <h3>Login Test</h3>
+    <input type="email" id="email" placeholder="Email" value="test@example.com">
+    <input type="password" id="password" placeholder="Password" value="testpassword123">
+    <button onclick="testLogin()">Test Login</button>
+</div>
+
+<div id="result"></div>
+
+<script>
+    async function testLogin() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+
+        try {
+            const response = await fetch('http://localhost:8000/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email, password })
+            });
+
+            const data = await response.json();
+
+            document.getElementById('result').innerHTML = `
+                    <h4>Response:</h4>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                    <p>Status: ${response.status}</p>
+                    <p>Has access_token: ${!!data.access_token}</p>
+                    <p>Has user: ${!!data.user}</p>
+                    <p>User name: ${data.user?.name || 'N/A'}</p>
+                `;
+        } catch (error) {
+            document.getElementById('result').innerHTML = `Error: ${error}`;
+        }
+    }
+</script>
+</body>
+</html>

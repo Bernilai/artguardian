@@ -1,0 +1,7 @@
+export {default as Dashboard} from './Dashboard'
+export {default as Analytics} from './Analytics'
+export {default as Collection} from './Collection'
+export {default as Tickets} from './Tickets'
+export {default as Settings} from './Settings'
+export {Login} from './Login'
+export {Register} from './Register'

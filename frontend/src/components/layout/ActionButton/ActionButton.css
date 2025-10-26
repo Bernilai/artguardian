@@ -1,0 +1,49 @@
+.action-button {
+    position: relative;
+    background: none;
+    border: none;
+    padding: var(--spacing-sm);
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+}
+
+.action-button:hover {
+    background-color: var(--divider);
+    color: var(--text-primary);
+}
+
+.action-button--disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.action-button--disabled:hover {
+    background-color: transparent;
+    color: var(--text-secondary);
+}
+
+.action-button__badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background-color: #d32f2f !important; /* Явно указываем красный цвет */
+    color: white !important;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: translate(25%, -25%);
+    font-weight: 600;
+    border: 2px solid var(--surface);
+}

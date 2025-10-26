@@ -1,0 +1,35 @@
+layout {
+    display: flex;
+    min-height: 100vh;
+    background-color: var(--background);
+}
+
+.layout-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-left: 250px; /* Ширина сайдбара */
+    transition: margin-left 0.3s ease;
+}
+
+.layout-main--collapsed {
+    margin-left: 60px;
+}
+
+.layout-content {
+    flex: 1;
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+    background-color: var(--background);
+    min-height: calc(100vh - 70px);
+}
+
+@media (max-width: 768px) {
+    .layout-main {
+        margin-left: 0;
+    }
+
+    .layout-content {
+        padding: var(--spacing-md);
+    }
+}
