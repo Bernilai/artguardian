@@ -77,13 +77,14 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login", response_model=Token)
 async def login(
         response: Response,
+        request: Request,
         login_data: LoginRequest,
         db: Session = Depends(get_db)
 ):
     try:
         logger.info(f"🔐 Login attempt for email: {login_data.email}")
 
-        # Существующая логика аутентификации
+        # Аутентификация
         user = get_user_by_email(db, login_data.email)
         if not user or not verify_password(login_data.password, user.hashed_password):
             raise HTTPException(status_code=401, detail="Incorrect email or password")
@@ -91,33 +92,54 @@ async def login(
         if not user.is_active:
             raise HTTPException(status_code=400, detail="Inactive user")
 
-        # Создаем токены
+        # 🔥 ИЩЕМ СУЩЕСТВУЮЩИЙ АКТИВНЫЙ REFRESH TOKEN
+        existing_token = db.query(RefreshToken).filter(
+            RefreshToken.user_id == user.id,
+            RefreshToken.revoked == False,
+            RefreshToken.expires_at > datetime.utcnow()
+        ).first()
+
+        refresh_token_value = None
+
+        if existing_token:
+            # 🔥 ИСПОЛЬЗУЕМ СУЩЕСТВУЮЩИЙ ТОКЕН (продлеваем срок)
+            logger.info(f"🔄 Using existing refresh token for user: {user.email}")
+            existing_token.expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+            # 🔥 НЕ МОЖЕМ ПОЛУЧИТЬ ОРИГИНАЛЬНЫЙ ТОКЕН, ПОЭТОМУ НИЧЕГО НЕ ДЕЛАЕМ С COOKIE
+            # Cookie останется прежним, если пользователь не очистил его
+            refresh_token_value = "existing"  # Маркер, что токен уже существует
+        else:
+            # 🔥 СОЗДАЕМ НОВЫЙ ТОКЕН ТОЛЬКО ЕСЛИ НЕТ АКТИВНОГО
+            logger.info(f"🆕 Creating new refresh token for user: {user.email}")
+            refresh_token_value = create_refresh_token()
+            refresh_token_hash = hash_token(refresh_token_value)
+
+            db_refresh_token = RefreshToken(
+                user_id=user.id,
+                token_hash=refresh_token_hash,
+                expires_at=datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+            )
+            db.add(db_refresh_token)
+
+        # Создаем access token
         access_token = create_access_token(data={"sub": user.id, "email": user.email})
-        refresh_token = create_refresh_token()
 
-        # Сохраняем refresh token в БД
-        refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-        refresh_token_hash = hash_token(refresh_token)
-
-        db_refresh_token = RefreshToken(
-            user_id=user.id,
-            token_hash=refresh_token_hash,
-            expires_at=datetime.utcnow() + refresh_token_expires
-        )
-
-        db.add(db_refresh_token)
         db.commit()
 
-        # Устанавливаем refresh token в httpOnly cookie
-        response.set_cookie(
-            key="refresh_token",
-            value=refresh_token,
-            httponly=True,
-            secure=False,  # True в production (HTTPS)
-            samesite="lax",
-            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,  # seconds
-            path="/api/auth/"  # Доступен только для auth эндпоинтов
-        )
+        # 🔥 УСТАНАВЛИВАЕМ COOKIE ТОЛЬКО ЕСЛИ СОЗДАЛИ НОВЫЙ ТОКЕН
+        if refresh_token_value != "existing":
+            logger.info(f"🍪 Setting new refresh_token cookie for: {login_data.email}")
+            response.set_cookie(
+                key="refresh_token",
+                value=refresh_token_value,
+                httponly=True,
+                secure=False,
+                samesite="lax",
+                max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+                path="/"
+            )
+        else:
+            logger.info(f"🔁 Keeping existing refresh token cookie for: {login_data.email}")
 
         logger.info(f"✅ Login successful for: {login_data.email}")
 
@@ -161,27 +183,10 @@ async def refresh_token(
         if not user.is_active:
             raise HTTPException(status_code=400, detail="Inactive user")
 
-        # Создаем новые токены
         access_token = create_access_token(data={"sub": user.id, "email": user.email})
-        new_refresh_token = create_refresh_token()
-        new_refresh_token_hash = hash_token(new_refresh_token)
-
-        # Обновляем refresh token (rotation)
-        db_token.token_hash = new_refresh_token_hash
         db_token.expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
         db.commit()
-
-        # 🔥 Устанавливаем новый refresh token в cookie
-        response.set_cookie(
-            key="refresh_token",
-            value=new_refresh_token,
-            httponly=True,
-            secure=False,
-            samesite="lax",
-            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-            path="/api/auth/"
-        )
 
         return Token(
             access_token=access_token,
@@ -221,7 +226,7 @@ async def logout(
         # Удаляем cookie
         response.delete_cookie(
             key="refresh_token",
-            path="/api/auth/"
+            path="/"
         )
 
         return {"message": "Successfully logged out"}

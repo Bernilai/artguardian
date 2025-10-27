@@ -1,17 +1,21 @@
+// src/hooks/useApi.ts
 import { useState, useEffect } from 'react';
-import { Artifact } from '../types/artifacts';
-import { apiService } from '../services/api';
+import { Artifact } from '../types';
+import { artifactsAPI } from '../services';
+import { useAuth } from '../contexts';
 
 export const useApi = () => {
     const [artifacts, setArtifacts] = useState<Artifact[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const { accessToken } = useAuth();
 
     const fetchArtifacts = async () => {
         try {
             setLoading(true);
             setError(null);
-            const data = await apiService.fetchArtifacts();
+            // 🔥 Используем новый API сервис
+            const data = await artifactsAPI.fetchArtifacts(accessToken || undefined);
             setArtifacts(data);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Unknown error occurred');
@@ -23,7 +27,8 @@ export const useApi = () => {
 
     const fetchArtifactById = async (id: string): Promise<Artifact | null> => {
         try {
-            return await apiService.fetchArtifactById(id);
+            // 🔥 Используем новый API сервис
+            return await artifactsAPI.fetchArtifactById(id, accessToken || undefined);
         } catch (err) {
             console.error(`Failed to fetch artifact ${id}:`, err);
             return null;
@@ -31,8 +36,10 @@ export const useApi = () => {
     };
 
     useEffect(() => {
-        fetchArtifacts();
-    }, []);
+        if (accessToken) {
+            fetchArtifacts();
+        }
+    }, [accessToken]);
 
     return {
         artifacts,

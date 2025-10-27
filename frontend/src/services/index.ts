@@ -1,3 +1,5 @@
-export {apiService} from './api';
+export { apiService } from './api';
+export { authAPI, setRefreshCallback } from './authAPI';
+export { artifactsAPI } from './artifactsAPI';
 
-export {authAPI} from './auth'
+export { mockAuthAPI } from './mockAuth';
