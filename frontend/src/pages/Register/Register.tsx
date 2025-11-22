@@ -11,44 +11,48 @@ export const Register: React.FC = () => {
         confirmPassword: '',
         name: ''
     });
+
     const [errors, setErrors] = useState<{[key: string]: string}>({});
+
+    const validateForm = (): boolean => {
+        const newErrors: Record<string, string> = {};
+
+        const emailPattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+        if (!formData.email.trim()) {
+            newErrors.email = "Введите email";
+        } else if (!emailPattern.test(formData.email)) {
+            newErrors.email = "Некорректный формат email";
+        }
+
+        const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:'",.<>?/\\|`~]{8,32}$/;
+        if (!formData.password) {
+            newErrors.password = "Введите пароль";
+        } else if (formData.password.length < 8 || formData.password.length > 32) {
+            newErrors.password = "Пароль должен содержать от 8 до 32 символов";
+        } else if (!passwordPattern.test(formData.password) || formData.password.includes(' ')) {
+            newErrors.password  = "Пароль содержит недопустимые символы или пробелы";
+        }
+
+        const namePattern = /^[А-Яа-яЁё \-']+$/
+        if (!formData.name.trim()) {
+            newErrors.name = "Введите имя";
+        } else if (!namePattern.test(formData.name)) {
+            newErrors.namr = "Имя должно содержать только русские буквы, пробелы, дефисы и апострофы";
+        }
+
+        if (!formData.confirmPassword) {
+            newErrors.confirmPassword = "Подтвердите пароль";
+        } else if (formData.confirmPassword !== formData.password) {
+            newErrors.confirmPassword = "Пароли не совпадают";
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
     const [isLoading, setIsLoading] = useState(false);
 
     const navigate = useNavigate();
-
-    // Функции валидации
-    const validateName = (name: string): string => {
-        if (!name.trim()) return 'Имя обязательно для заполнения';
-        if (!/^[a-zA-Zа-яА-ЯёЁ\s-]+$/.test(name)) return 'Имя может содержать только буквы, пробелы и дефисы';
-        if (name.length < 2) return 'Имя должно содержать минимум 2 символа';
-        if (name.length > 50) return 'Имя не должно превышать 50 символов';
-        return '';
-    };
-
-    const validateEmail = (email: string): string => {
-        if (!email.trim()) return 'Email обязателен';
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Введите корректный email адрес';
-        return '';
-    };
-
-    const validatePassword = (password: string): string => {
-        if (!password) return 'Пароль обязателен';
-        if (password.length < 6) return 'Пароль должен содержать минимум 6 символов';
-        if (password.length > 100) return 'Пароль не должен превышать 100 символов';
-        return '';
-    };
-
-    const validateForm = (): boolean => {
-        const newErrors = {
-            name: validateName(formData.name),
-            email: validateEmail(formData.email),
-            password: validatePassword(formData.password),
-            confirmPassword: formData.password !== formData.confirmPassword ? 'Пароли не совпадают' : ''
-        };
-
-        setErrors(newErrors);
-        return !Object.values(newErrors).some(error => error !== '');
-    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -68,29 +72,40 @@ export const Register: React.FC = () => {
 
     const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        let error = '';
+        let error = "";
 
-        switch (name) {
-            case 'name':
-                error = validateName(value);
-                break;
-            case 'email':
-                error = validateEmail(value);
-                break;
-            case 'password':
-                error = validatePassword(value);
-                break;
-            case 'confirmPassword':
-                error = formData.password !== value ? 'Пароли не совпадают' : '';
-                break;
+        if (name === "email") {
+            const emailPattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+            if (!value.trim()) {
+                error = "Введите email";
+            } else if (!emailPattern.test(value)) {
+                error = "Некорректный формат email";
+            }
+        } else if (name === "password") {
+            const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:'",.<>?/\\|`~]{8,32}$/;
+            if (!value) {
+                error = "Введите пароль";
+            } else if (value.length < 8 || value.length > 32) {
+                error = "Пароль должен содержать от 8 до 32 символов";
+            } else if (!passwordPattern.test(value) || value.includes(' ')) {
+                error = "Пароль содержит недопустимые символы или пробелы";
+            }
+        } else if (name === "name") {
+            const namePattern = /^[А-Яа-яЁё \-']+$/;
+            if (!value.trim()) {
+                error = "Введите имя";
+            } else if (!namePattern.test(value)) {
+                error = "Имя должно содержать только русские буквы, пробелы, дефисы и апострофы";
+            }
+        } else if (name === "confirmPassword") {
+            if (!value) {
+                error = "Подтвердите пароль";
+            } else if (value !== formData.password) {
+                error = "Пароли не совпадают";
+            }
         }
 
-        if (error) {
-            setErrors(prev => ({
-                ...prev,
-                [name]: error
-            }));
-        }
+        setErrors(prev => ({ ...prev, [name]: error }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -169,7 +184,7 @@ export const Register: React.FC = () => {
                             required
                             disabled={isLoading}
                             minLength={6}
-                            placeholder="Минимум 6 символов"
+                            placeholder="Минимум 8 символов"
                         />
                         {errors.password && <span className="field-error">{errors.password}</span>}
                     </div>
@@ -185,7 +200,7 @@ export const Register: React.FC = () => {
                             onBlur={handleBlur}
                             required
                             disabled={isLoading}
-                            minLength={6}
+                            minLength={8}
                         />
                         {errors.confirmPassword && <span className="field-error">{errors.confirmPassword}</span>}
                     </div>

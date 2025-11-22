@@ -14,7 +14,6 @@ export const useApi = () => {
         try {
             setLoading(true);
             setError(null);
-            // 🔥 Используем новый API сервис
             const data = await artifactsAPI.fetchArtifacts(accessToken || undefined);
             setArtifacts(data);
         } catch (err) {
@@ -27,7 +26,6 @@ export const useApi = () => {
 
     const fetchArtifactById = async (id: string): Promise<Artifact | null> => {
         try {
-            // 🔥 Используем новый API сервис
             return await artifactsAPI.fetchArtifactById(id, accessToken || undefined);
         } catch (err) {
             console.error(`Failed to fetch artifact ${id}:`, err);

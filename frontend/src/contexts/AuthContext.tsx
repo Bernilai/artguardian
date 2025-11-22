@@ -1,7 +1,6 @@
-// contexts/AuthContext.tsx
 import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { authAPI, setRefreshCallback } from '../services/authAPI';
-import { User, AuthResponse } from '../types'; // Добавьте AuthResponse в импорт
+import { User, AuthResponse } from '../types';
 
 interface AuthContextType {
     user: User | null;
@@ -28,12 +27,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [accessToken, setAccessToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    // 🔥 Исправляем типы - теперь храним Promise<AuthResponse>
     const refreshPromiseRef = useRef<Promise<AuthResponse> | null>(null);
     const initializedRef = useRef(false);
 
     const refreshTokens = async (): Promise<string> => {
-        // 🔥 Если запрос уже выполняется, возвращаем существующий Promise
         if (refreshPromiseRef.current) {
             console.log("🔄 Using existing refresh promise");
             const response = await refreshPromiseRef.current;
@@ -53,12 +50,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error("❌ Token refresh failed:", error);
             throw error;
         } finally {
-            // 🔥 Сбрасываем Promise после завершения
             refreshPromiseRef.current = null;
         }
     };
 
-    // 🔥 Регистрируем callback в API service
     useEffect(() => {
         console.log("🔧 Registering refresh callback in API service");
         setRefreshCallback(refreshTokens);
@@ -66,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Инициализация при загрузке приложения
     useEffect(() => {
-        // 🔥 Защита от двойного вызова в StrictMode
+        // Защита от двойного вызова в StrictMode
         if (initializedRef.current) return;
         initializedRef.current = true;
 
@@ -89,7 +84,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
         } catch (error) {
             console.log("ℹ️ User not authenticated (normal for first visit):", error);
-            // 🔥 Не сбрасываем состояние, если пользователь не авторизован
         } finally {
             console.log("🏁 Auth initialization complete");
             setIsLoading(false);

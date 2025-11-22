@@ -40,7 +40,7 @@ def get_password_hash(password: str) -> str:
             password_bytes = password.encode('utf-8')
             if len(password_bytes) > 72:
                 logger.warning("Password too long for bcrypt, using SHA-256 pre-hashing")
-                # Хэшируем пароль перед передачей в bcrypt чтобы обойти ограничение длины
+                # Хэшируем пароль перед передачей в bcrypt, чтобы обойти ограничение длины
                 password = hashlib.sha256(password_bytes).hexdigest()
 
         return pwd_context.hash(password)

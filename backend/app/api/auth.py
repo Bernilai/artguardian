@@ -92,7 +92,6 @@ async def login(
         if not user.is_active:
             raise HTTPException(status_code=400, detail="Inactive user")
 
-        # 🔥 ИЩЕМ СУЩЕСТВУЮЩИЙ АКТИВНЫЙ REFRESH TOKEN
         existing_token = db.query(RefreshToken).filter(
             RefreshToken.user_id == user.id,
             RefreshToken.revoked == False,
@@ -102,14 +101,10 @@ async def login(
         refresh_token_value = None
 
         if existing_token:
-            # 🔥 ИСПОЛЬЗУЕМ СУЩЕСТВУЮЩИЙ ТОКЕН (продлеваем срок)
             logger.info(f"🔄 Using existing refresh token for user: {user.email}")
             existing_token.expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-            # 🔥 НЕ МОЖЕМ ПОЛУЧИТЬ ОРИГИНАЛЬНЫЙ ТОКЕН, ПОЭТОМУ НИЧЕГО НЕ ДЕЛАЕМ С COOKIE
-            # Cookie останется прежним, если пользователь не очистил его
             refresh_token_value = "existing"  # Маркер, что токен уже существует
         else:
-            # 🔥 СОЗДАЕМ НОВЫЙ ТОКЕН ТОЛЬКО ЕСЛИ НЕТ АКТИВНОГО
             logger.info(f"🆕 Creating new refresh token for user: {user.email}")
             refresh_token_value = create_refresh_token()
             refresh_token_hash = hash_token(refresh_token_value)
@@ -126,7 +121,6 @@ async def login(
 
         db.commit()
 
-        # 🔥 УСТАНАВЛИВАЕМ COOKIE ТОЛЬКО ЕСЛИ СОЗДАЛИ НОВЫЙ ТОКЕН
         if refresh_token_value != "existing":
             logger.info(f"🍪 Setting new refresh_token cookie for: {login_data.email}")
             response.set_cookie(

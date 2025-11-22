@@ -7,7 +7,6 @@ export class ApiError extends Error {
     }
 }
 
-// 🔥 Интерфейс для callback обновления токенов
 export interface RefreshTokenCallback {
     (): Promise<string>;
 }
@@ -21,7 +20,6 @@ class ApiService {
         this.baseURL = baseURL;
     }
 
-    // 🔥 Регистрируем callback для обновления токенов
     setRefreshCallback(callback: RefreshTokenCallback) {
         this.refreshCallback = callback;
     }
@@ -53,7 +51,7 @@ class ApiService {
         try {
             const response = await fetch(url, config);
 
-            // 🔥 Проверяем наличие заголовка X-Retry
+            // Проверяем наличие заголовка X-Retry
             const hasRetryHeader = headers.get('X-Retry') === 'true';
 
             if (response.status === 401 && !hasRetryHeader) {
@@ -110,7 +108,6 @@ class ApiService {
         }
     }
 
-    // 🔥 БАЗОВЫЕ HTTP МЕТОДЫ
     async get<T>(endpoint: string, token?: string): Promise<T> {
         const headers = new Headers();
         if (token) {
@@ -177,7 +174,6 @@ class ApiService {
         return this.request<T>(endpoint, config);
     }
 
-    // 🔥 ДОПОЛНИТЕЛЬНЫЕ МЕТОДЫ
     async getWithParams<T>(
         endpoint: string,
         params: Record<string, any>,
@@ -216,7 +212,6 @@ class ApiService {
         if (token) {
             headers.set('Authorization', `Bearer ${token}`);
         }
-        // 🔥 Убираем Content-Type для FormData - браузер установит сам с boundary
 
         return this.request<T>(endpoint, {
             method: 'POST',

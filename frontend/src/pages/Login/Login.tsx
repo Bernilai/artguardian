@@ -26,13 +26,26 @@ export const Login: React.FC = () => {
     }, [location.state]);
 
     const validateForm = (): boolean => {
-        const newErrors = {
-            email: !formData.email.trim() ? 'Email обязателен' : '',
-            password: !formData.password ? 'Пароль обязателен' : ''
-        };
+        const newErrors: Record<string, string> = {};
+
+        const emailPattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+        if (!formData.email.trim()) {
+            newErrors.email = "Введите email";
+        } else if (!emailPattern.test(formData.email)) {
+            newErrors.email = "Некорректный формат email";
+        }
+        
+        const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:'",.<>?/\\|`~]{8,32}$/;
+        if (!formData.password) {
+            newErrors.password = "Введите пароль";
+        } else if (formData.password.length < 8 || formData.password.length > 32) {
+            newErrors.password = "Пароль должен содержать от 8 до 32 символов";
+        } else if (!passwordPattern.test(formData.password) || formData.password.includes(' ')) {
+            newErrors.password  = "Пароль содержит недопустимые символы или пробелы";
+        }
 
         setErrors(newErrors);
-        return !Object.values(newErrors).some(error => error !== '');
+        return Object.keys(newErrors).length === 0;
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,26 +62,6 @@ export const Login: React.FC = () => {
             }));
         }
     };
-
-    // const handleSubmit = async (e: React.FormEvent) => {
-    //     e.preventDefault();
-    //     setMessage('');
-    //
-    //     if (!validateForm()) {
-    //         return;
-    //     }
-    //
-    //     setIsLoading(true);
-    //
-    //     try {
-    //         await login(formData.email, formData.password);
-    //         navigate(from, { replace: true });
-    //     } catch (err: any) {
-    //         setErrors({ submit: err.message || 'Ошибка при входе' });
-    //     } finally {
-    //         setIsLoading(false);
-    //     }
-    // };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -89,7 +82,25 @@ export const Login: React.FC = () => {
             navigate(from, { replace: true });
         } catch (err: any) {
             console.error("❌ Login error:", err);
-            setErrors({ submit: err.message || 'Ошибка при входе' });
+            let errorText = "Ошибка при входе";
+            if (err?.response) {
+                if (err.response.status === 401) {
+                    errorText = "Неверный email или пароль"
+                } else if (typeof err.response.data?.detail === "string") {
+                    errorText = err.response.data.detail;
+                }
+            } else if (typeof err?.message === "string") {
+                try {
+                    const json = JSON.parse(err.message);
+                    if (json.detail) errorText = json.detail;
+                } catch {
+                    errorText = err.message;
+                }
+                if (errorText.includes("Login failed") || errorText.includes("Incorrect email or password")) {
+                    errorText = "Неверный email или пароль";
+                }
+            }
+            setErrors({ submit: errorText });
         } finally {
             setIsLoading(false);
         }
