@@ -74,3 +74,12 @@ frontend/.next/
 .coverage
 htmlcov/
 .pytest_cache/
+
+# ML Models (too large for Git)
+backend/model/
+*.h5
+*.pb
+*.ckpt
+*.pth
+*.pt
+*.safetensors
