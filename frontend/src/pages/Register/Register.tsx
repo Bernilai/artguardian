@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authAPI } from '../../services';
-import { Button} from "../../components";
+import { Button } from "../../components";
 import './Register.css';
 
 export const Register: React.FC = () => {
@@ -13,43 +13,6 @@ export const Register: React.FC = () => {
     });
 
     const [errors, setErrors] = useState<{[key: string]: string}>({});
-
-    const validateForm = (): boolean => {
-        const newErrors: Record<string, string> = {};
-
-        const emailPattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-        if (!formData.email.trim()) {
-            newErrors.email = "Введите email";
-        } else if (!emailPattern.test(formData.email)) {
-            newErrors.email = "Некорректный формат email";
-        }
-
-        const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:'",.<>?/\\|`~]{8,32}$/;
-        if (!formData.password) {
-            newErrors.password = "Введите пароль";
-        } else if (formData.password.length < 8 || formData.password.length > 32) {
-            newErrors.password = "Пароль должен содержать от 8 до 32 символов";
-        } else if (!passwordPattern.test(formData.password) || formData.password.includes(' ')) {
-            newErrors.password  = "Пароль содержит недопустимые символы или пробелы";
-        }
-
-        const namePattern = /^[А-Яа-яЁё \-']+$/
-        if (!formData.name.trim()) {
-            newErrors.name = "Введите имя";
-        } else if (!namePattern.test(formData.name)) {
-            newErrors.namr = "Имя должно содержать только русские буквы, пробелы, дефисы и апострофы";
-        }
-
-        if (!formData.confirmPassword) {
-            newErrors.confirmPassword = "Подтвердите пароль";
-        } else if (formData.confirmPassword !== formData.password) {
-            newErrors.confirmPassword = "Пароли не совпадают";
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
     const [isLoading, setIsLoading] = useState(false);
 
     const navigate = useNavigate();
@@ -61,58 +24,96 @@ export const Register: React.FC = () => {
             [name]: value
         }));
 
-        // Очищаем ошибку при изменении поля
-        if (errors[name]) {
-            setErrors(prev => ({
-                ...prev,
-                [name]: ''
-            }));
+        // Clear custom validity for all fields when user types
+        const input = e.target;
+        input.setCustomValidity("");
+        
+        if (name === 'password' || name === 'confirmPassword') {
+            // If confirmPassword, also revalidate it against password
+            if (name === 'password') {
+                const confirmPasswordInput = document.getElementById('confirmPassword') as HTMLInputElement;
+                if (confirmPasswordInput && confirmPasswordInput.value) {
+                    if (confirmPasswordInput.value !== value) {
+                        confirmPasswordInput.setCustomValidity("Пароли не совпадают");
+                    } else {
+                        confirmPasswordInput.setCustomValidity("");
+                    }
+                }
+            }
         }
     };
 
-    const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        let error = "";
-
-        if (name === "email") {
-            const emailPattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-            if (!value.trim()) {
-                error = "Введите email";
-            } else if (!emailPattern.test(value)) {
-                error = "Некорректный формат email";
-            }
-        } else if (name === "password") {
-            const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:'",.<>?/\\|`~]{8,32}$/;
-            if (!value) {
-                error = "Введите пароль";
-            } else if (value.length < 8 || value.length > 32) {
-                error = "Пароль должен содержать от 8 до 32 символов";
-            } else if (!passwordPattern.test(value) || value.includes(' ')) {
-                error = "Пароль содержит недопустимые символы или пробелы";
-            }
-        } else if (name === "name") {
-            const namePattern = /^[А-Яа-яЁё \-']+$/;
-            if (!value.trim()) {
-                error = "Введите имя";
-            } else if (!namePattern.test(value)) {
-                error = "Имя должно содержать только русские буквы, пробелы, дефисы и апострофы";
-            }
-        } else if (name === "confirmPassword") {
-            if (!value) {
-                error = "Подтвердите пароль";
-            } else if (value !== formData.password) {
-                error = "Пароли не совпадают";
-            }
-        }
-
-        setErrors(prev => ({ ...prev, [name]: error }));
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!validateForm()) {
-            return;
+        // Validate password using native HTML5 validation
+        const passwordInput = document.getElementById('password') as HTMLInputElement;
+        if (passwordInput) {
+            const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:'",.<>?/\\|`~]{8,32}$/;
+            if (!formData.password) {
+                passwordInput.setCustomValidity("Введите пароль");
+            } else if (formData.password.length < 8 || formData.password.length > 32) {
+                passwordInput.setCustomValidity("Пароль должен содержать от 8 до 32 символов");
+            } else if (!passwordPattern.test(formData.password) || formData.password.includes(' ')) {
+                passwordInput.setCustomValidity("Пароль содержит недопустимые символы или пробелы");
+            } else {
+                passwordInput.setCustomValidity("");
+            }
+            
+            if (!passwordInput.reportValidity()) {
+                return;
+            }
+        }
+
+        // Validate confirm password using native HTML5 validation
+        const confirmPasswordInput = document.getElementById('confirmPassword') as HTMLInputElement;
+        if (confirmPasswordInput) {
+            if (!formData.confirmPassword) {
+                confirmPasswordInput.setCustomValidity("Подтвердите пароль");
+            } else if (formData.confirmPassword !== formData.password) {
+                confirmPasswordInput.setCustomValidity("Пароли не совпадают");
+            } else {
+                confirmPasswordInput.setCustomValidity("");
+            }
+            
+            if (!confirmPasswordInput.reportValidity()) {
+                return;
+            }
+        }
+
+        // Validate email using native HTML5 validation
+        const emailInput = document.getElementById('email') as HTMLInputElement;
+        if (emailInput) {
+            const emailPattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+            if (!formData.email.trim()) {
+                emailInput.setCustomValidity("Введите email");
+            } else if (!emailPattern.test(formData.email)) {
+                emailInput.setCustomValidity("Некорректный формат email");
+            } else {
+                emailInput.setCustomValidity("");
+            }
+            
+            if (!emailInput.reportValidity()) {
+                return;
+            }
+        }
+
+        // Validate name using native HTML5 validation
+        const nameInput = document.getElementById('name') as HTMLInputElement;
+        if (nameInput) {
+            const namePattern = /^[А-Яа-яЁё \-']+$/;
+            if (!formData.name.trim()) {
+                nameInput.setCustomValidity("Введите имя");
+            } else if (!namePattern.test(formData.name)) {
+                nameInput.setCustomValidity("Имя должно содержать только русские буквы, пробелы, дефисы и апострофы");
+            } else {
+                nameInput.setCustomValidity("");
+            }
+            
+            if (!nameInput.reportValidity()) {
+                return;
+            }
         }
 
         setIsLoading(true);
@@ -148,12 +149,10 @@ export const Register: React.FC = () => {
                             name="name"
                             value={formData.name}
                             onChange={handleChange}
-                            onBlur={handleBlur}
                             required
                             disabled={isLoading}
                             placeholder="Иван Иванов"
                         />
-                        {errors.name && <span className="field-error">{errors.name}</span>}
                     </div>
 
                     <div className="form-group">
@@ -164,12 +163,10 @@ export const Register: React.FC = () => {
                             name="email"
                             value={formData.email}
                             onChange={handleChange}
-                            onBlur={handleBlur}
                             required
                             disabled={isLoading}
                             placeholder="ivan@example.com"
                         />
-                        {errors.email && <span className="field-error">{errors.email}</span>}
                     </div>
 
                     <div className="form-group">
@@ -180,13 +177,12 @@ export const Register: React.FC = () => {
                             name="password"
                             value={formData.password}
                             onChange={handleChange}
-                            onBlur={handleBlur}
                             required
                             disabled={isLoading}
-                            minLength={6}
+                            minLength={8}
+                            maxLength={32}
                             placeholder="Минимум 8 символов"
                         />
-                        {errors.password && <span className="field-error">{errors.password}</span>}
                     </div>
 
                     <div className="form-group">
@@ -197,12 +193,10 @@ export const Register: React.FC = () => {
                             name="confirmPassword"
                             value={formData.confirmPassword}
                             onChange={handleChange}
-                            onBlur={handleBlur}
                             required
                             disabled={isLoading}
                             minLength={8}
                         />
-                        {errors.confirmPassword && <span className="field-error">{errors.confirmPassword}</span>}
                     </div>
 
                     <Button

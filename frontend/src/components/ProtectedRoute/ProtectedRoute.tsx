@@ -15,27 +15,17 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     const { isAuthenticated, user, isLoading } = useAuth();
     const location = useLocation();
 
-    console.log("🛡️ ProtectedRoute check:", {
-        isLoading,
-        isAuthenticated,
-        user: user?.email
-    });
-
     if (isLoading) {
-        console.log("⏳ ProtectedRoute: Still loading...");
         return <LoadingSpinner fullScreen text="Проверка авторизации..." />;
     }
 
     if (!isAuthenticated) {
-        console.log("🚫 ProtectedRoute: Not authenticated, redirecting to login");
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
     if (requiredRole && user?.role !== requiredRole && user?.role !== 'admin') {
-        console.log("🚫 ProtectedRoute: Insufficient permissions");
-        return <Navigate to="/unauthorized" replace />;
+        return <Navigate to="/dashboard" replace />;
     }
 
-    console.log("✅ ProtectedRoute: Access granted");
     return <>{children}</>;
 };

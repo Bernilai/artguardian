@@ -1,5 +1,5 @@
 # /app/security.py
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -26,7 +26,15 @@ logger.info(f"Using hashing algorithm: {pwd_context.default_scheme()}")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
-        return pwd_context.verify(plain_password, hashed_password)
+        # Для bcrypt обрабатываем длинные пароли так же, как при хэшировании
+        password_to_verify = plain_password
+        if pwd_context.default_scheme() == "bcrypt":
+            password_bytes = plain_password.encode('utf-8')
+            if len(password_bytes) > 72:
+                # Если пароль был предварительно хэширован, хэшируем и проверяемый пароль
+                password_to_verify = hashlib.sha256(password_bytes).hexdigest()
+        
+        return pwd_context.verify(password_to_verify, hashed_password)
     except Exception as e:
         logger.error(f"Password verification error: {str(e)}")
         return False
@@ -34,13 +42,14 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     try:
-        # Для bcrypt обрезаем пароль до 72 байт или используем хэш
+        # Для bcrypt обрабатываем длинные пароли
         if pwd_context.default_scheme() == "bcrypt":
             # Преобразуем в байты для проверки длины
             password_bytes = password.encode('utf-8')
             if len(password_bytes) > 72:
                 logger.warning("Password too long for bcrypt, using SHA-256 pre-hashing")
                 # Хэшируем пароль перед передачей в bcrypt, чтобы обойти ограничение длины
+                # Используем hexdigest для получения строки фиксированной длины
                 password = hashlib.sha256(password_bytes).hexdigest()
 
         return pwd_context.hash(password)
@@ -53,9 +62,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     try:
         to_encode = data.copy()
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now(timezone.utc) + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)

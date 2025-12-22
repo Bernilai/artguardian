@@ -1,6 +1,7 @@
 import React from 'react';
 import {Artifact, Defect} from "../../../types";
 import {StatusBadge, LoadingSpinner} from "../../ui";
+import { useAuth } from "../../../contexts";
 import './ArtifactDetail.css';
 
 export interface ArtifactDetailProps {
@@ -9,6 +10,10 @@ export interface ArtifactDetailProps {
     onEdit?: (artifact: Artifact) => void;
     onClose?: () => void;
     onDefectClick?: (defect: Defect) => void;
+    onAutoDetect?: (artifact: Artifact) => void;
+    autoDetecting?: boolean;
+    onInspect?: (artifact: Artifact) => void;
+    inspecting?: boolean;
 }
 
 const ArtifactDetail: React.FC<ArtifactDetailProps> = ({
@@ -16,8 +21,15 @@ const ArtifactDetail: React.FC<ArtifactDetailProps> = ({
                                                            loading = false,
                                                            onEdit,
                                                            onClose,
-                                                           onDefectClick
+                                                           onDefectClick,
+                                                           onAutoDetect,
+                                                           autoDetecting = false,
+                                                           onInspect,
+                                                           inspecting = false
                                                        }) => {
+    const { user } = useAuth();
+    const canInspect = user && (user.role === 'restorer' || user.role === 'curator' || user.role === 'admin');
+    const showInspectionInfo = canInspect;
     if (loading) {
         return (
             <div className="artifact-detail artifact-detail--loading">
@@ -50,6 +62,26 @@ const ArtifactDetail: React.FC<ArtifactDetailProps> = ({
                 </div>
 
                 <div className="artifact-detail__actions">
+                    {onAutoDetect && artifact?.images && artifact.images.length > 0 && (
+                        <button
+                            className="btn btn-secondary"
+                            onClick={() => onAutoDetect(artifact)}
+                            disabled={autoDetecting}
+                            title="Автоматическое обнаружение повреждений"
+                        >
+                            {autoDetecting ? '🤖 Анализ...' : '🤖 AI Анализ'}
+                        </button>
+                    )}
+                    {onInspect && canInspect && (
+                        <button
+                            className="btn btn-secondary"
+                            onClick={() => onInspect(artifact)}
+                            disabled={inspecting}
+                            title="Зафиксировать проверку артефакта"
+                        >
+                            {inspecting ? '⏳ Проверка...' : '✓ Зафиксировать проверку'}
+                        </button>
+                    )}
                     <button
                         className="btn btn-outline"
                         onClick={onClose}
@@ -111,10 +143,27 @@ const ArtifactDetail: React.FC<ArtifactDetailProps> = ({
                                 <label>Местоположение:</label>
                                 <span>{artifact.currentLocation}</span>
                             </div>
-                            <div className="info-item">
-                                <label>Последняя проверка:</label>
-                                <span>{new Date(artifact.lastInspection).toLocaleDateString('ru-RU')}</span>
-                            </div>
+                            {showInspectionInfo && (
+                                <>
+                                    <div className="info-item">
+                                        <label>Последняя проверка:</label>
+                                        <span>
+                                            {artifact.lastInspection && artifact.lastInspection !== '' 
+                                                ? (() => {
+                                                    const date = new Date(artifact.lastInspection);
+                                                    return isNaN(date.getTime()) ? artifact.lastInspection : date.toLocaleDateString('ru-RU');
+                                                })()
+                                                : 'Не указана'}
+                                        </span>
+                                    </div>
+                                    {artifact.lastInspector && (
+                                        <div className="info-item">
+                                            <label>Проверил:</label>
+                                            <span>{artifact.lastInspector}</span>
+                                        </div>
+                                    )}
+                                </>
+                            )}
                         </div>
                     </section>
 
@@ -181,7 +230,14 @@ const ArtifactDetail: React.FC<ArtifactDetailProps> = ({
                                             <p className="defect-item__description">{defect.description}</p>
                                         )}
                                         <div className="defect-item__meta">
-                                            <span>Обнаружен: {new Date(defect.detectedDate).toLocaleDateString('ru-RU')}</span>
+                                            <span>Обнаружен: {
+                                                defect.detectedDate && defect.detectedDate !== ''
+                                                    ? (() => {
+                                                        const date = new Date(defect.detectedDate);
+                                                        return isNaN(date.getTime()) ? defect.detectedDate : date.toLocaleDateString('ru-RU');
+                                                    })()
+                                                    : 'Не указана'
+                                            }</span>
                                             <span>Прогресс: {defect.progress}%</span>
                                         </div>
                                     </div>
@@ -211,7 +267,12 @@ const ArtifactDetail: React.FC<ArtifactDetailProps> = ({
                                     <div key={record.id} className="restoration-record">
                                         <div className="restoration-record__header">
                       <span className="restoration-record__date">
-                        {new Date(record.date).toLocaleDateString('ru-RU')}
+                        {record.date && record.date !== ''
+                            ? (() => {
+                                const date = new Date(record.date);
+                                return isNaN(date.getTime()) ? record.date : date.toLocaleDateString('ru-RU');
+                            })()
+                            : 'Не указана'}
                       </span>
                                             <span className="restoration-record__restorer">
                         {record.restorer}

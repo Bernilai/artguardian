@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts';
 import { Layout } from "./components";
-import { Dashboard, Collection, Tickets, Analytics, Settings, Login, Register } from './pages';
+import { Dashboard, Collection, Tickets, Analytics, Settings, Profile, Login, Register } from './pages';
 import { ProtectedRoute } from './components';
 import './App.css';
 
@@ -25,7 +25,12 @@ function App() {
                                     <Route path="/collection" element={<Collection />} />
                                     <Route path="/tickets" element={<Tickets />} />
                                     <Route path="/analytics" element={<Analytics />} />
-                                    <Route path="/settings" element={<Settings />} />
+                                    <Route path="/settings" element={
+                                        <ProtectedRoute requiredRole="admin">
+                                            <Settings />
+                                        </ProtectedRoute>
+                                    } />
+                                    <Route path="/profile" element={<Profile />} />
                                 </Routes>
                             </Layout>
                         </ProtectedRoute>

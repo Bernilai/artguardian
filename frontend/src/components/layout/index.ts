@@ -5,6 +5,7 @@ export {default as Breadcrumb} from './Breadcrumb'
 export {default as Layout} from './Layout'
 export {default as Sidebar} from './Sidebar'
 export {default as Header} from './Header'
+export {default as NotificationPanel} from './NotificationPanel'
 export {ConfirmDialog} from './ConfirmDialog'
 
 export type {BreadcrumbItem} from './Breadcrumb'

@@ -32,22 +32,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const refreshTokens = async (): Promise<string> => {
         if (refreshPromiseRef.current) {
-            console.log("🔄 Using existing refresh promise");
             const response = await refreshPromiseRef.current;
             return response.access_token;
         }
 
         try {
-            console.log("🔄 Attempting to refresh tokens...");
             refreshPromiseRef.current = authAPI.refresh();
             const response = await refreshPromiseRef.current;
 
-            console.log("✅ Token refresh response:", response);
             setAccessToken(response.access_token);
-            console.log("✅ Tokens refreshed successfully");
             return response.access_token;
         } catch (error) {
-            console.error("❌ Token refresh failed:", error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (!errorMessage.includes('Refresh token missing')) {
+                console.error("Token refresh failed:", error);
+            }
             throw error;
         } finally {
             refreshPromiseRef.current = null;
@@ -55,67 +54,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     useEffect(() => {
-        console.log("🔧 Registering refresh callback in API service");
         setRefreshCallback(refreshTokens);
     }, []);
 
-    // Инициализация при загрузке приложения
     useEffect(() => {
-        // Защита от двойного вызова в StrictMode
         if (initializedRef.current) return;
         initializedRef.current = true;
 
-        console.log("🚀 Initializing auth...");
         initializeAuth();
     }, []);
 
     const initializeAuth = async () => {
         try {
-            console.log("🔐 Starting auth initialization...");
             const token = await refreshTokens();
-            console.log("✅ Refresh successful, token:", token ? "received" : "none");
 
             if (token) {
-                console.log("👤 Fetching user data...");
                 const userData = await authAPI.getCurrentUser(token);
-                console.log("✅ User data received:", userData);
                 setUser(userData);
                 setAccessToken(token);
             }
         } catch (error) {
-            console.log("ℹ️ User not authenticated (normal for first visit):", error);
         } finally {
-            console.log("🏁 Auth initialization complete");
             setIsLoading(false);
         }
     };
 
     const login = async (email: string, password: string) => {
         try {
-            console.log("🔐 Attempting login...");
             const response = await authAPI.login({ email, password });
-            console.log("✅ Login response:", response);
 
             setAccessToken(response.access_token);
             setUser(response.user);
-
-            console.log("✅ Login successful");
         } catch (error) {
-            console.error("❌ Login failed:", error);
+            console.error("Login failed:", error);
             throw error;
         }
     };
 
     const logout = async () => {
         try {
-            console.log("🚪 Logging out...");
             await authAPI.logout();
         } catch (error) {
             console.error("Logout error:", error);
         } finally {
             setUser(null);
             setAccessToken(null);
-            console.log("✅ Logout complete");
         }
     };
 

@@ -1,5 +1,5 @@
 // src/hooks/useApi.ts
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Artifact } from '../types';
 import { artifactsAPI } from '../services';
 import { useAuth } from '../contexts';
@@ -10,11 +10,11 @@ export const useApi = () => {
     const [error, setError] = useState<string | null>(null);
     const { accessToken } = useAuth();
 
-    const fetchArtifacts = async () => {
+    const fetchArtifacts = useCallback(async (searchQuery?: string) => {
         try {
             setLoading(true);
             setError(null);
-            const data = await artifactsAPI.fetchArtifacts(accessToken || undefined);
+            const data = await artifactsAPI.fetchArtifacts(searchQuery, accessToken || undefined);
             setArtifacts(data);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Unknown error occurred');
@@ -22,7 +22,7 @@ export const useApi = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [accessToken]);
 
     const fetchArtifactById = async (id: string): Promise<Artifact | null> => {
         try {

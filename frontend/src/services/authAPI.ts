@@ -1,4 +1,4 @@
-// src/services/authAPI.ts
+import { API_BASE_URL } from './config';
 import { apiService } from './api';
 import { AuthResponse, User, LoginCredentials, RegisterData } from '../types';
 
@@ -10,14 +10,7 @@ export const setRefreshCallback = (callback: () => Promise<string>) => {
 };
 
 const authRequest = async <T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
-    const url = `${process.env.REACT_APP_API_URL || 'http://localhost:8000/api'}${endpoint}`;
-
-    console.log("🌐 Making auth request:", {
-        url,
-        method: options.method,
-        credentials: 'include',
-        hasBody: !!options.body
-    });
+    const url = `${API_BASE_URL}${endpoint}`;
 
     const config: RequestInit = {
         ...options,
@@ -31,16 +24,12 @@ const authRequest = async <T>(endpoint: string, options: RequestInit = {}): Prom
     try {
         const response = await fetch(url, config);
 
-        console.log("📨 Auth response:", {
-            status: response.status,
-            statusText: response.statusText,
-            headers: Object.fromEntries(response.headers.entries()),
-            ok: response.ok
-        });
-
         if (!response.ok) {
             const errorText = await response.text();
-            console.error("❌ Auth request failed:", errorText);
+            // Don't log 401 errors for refresh endpoint (expected on first visit)
+            if (response.status !== 401 || !endpoint.includes('/refresh')) {
+                console.error("Auth request failed:", errorText);
+            }
             throw new Error(errorText);
         }
 
@@ -48,11 +37,12 @@ const authRequest = async <T>(endpoint: string, options: RequestInit = {}): Prom
             return {} as T;
         }
 
-        const data = await response.json();
-        console.log("✅ Auth request success:", data);
-        return data;
+        return await response.json();
     } catch (error) {
-        console.error("💥 Auth request error:", error);
+        // Don't log 401 errors for refresh endpoint (expected on first visit)
+        if (!(error instanceof Error && error.message.includes('Refresh token missing'))) {
+            console.error("Auth request error:", error);
+        }
         throw error;
     }
 };
@@ -93,6 +83,79 @@ export const authAPI = {
         return authRequest<User>('/auth/me', {
             method: 'GET',
             headers,
+        });
+    },
+
+    async getUsers(role?: string, includeInactive?: boolean, token?: string): Promise<User[]> {
+        const headers: HeadersInit = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const params = new URLSearchParams();
+        if (role) params.append('role', role);
+        if (includeInactive) params.append('include_inactive', 'true');
+        
+        const url = params.toString() ? `/auth/users?${params}` : '/auth/users';
+        return authRequest<User[]>(url, {
+            method: 'GET',
+            headers,
+        });
+    },
+
+    async updateUser(userId: string, userData: { name?: string; role?: string; is_active?: boolean }, token?: string): Promise<User> {
+        const headers: HeadersInit = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        return authRequest<User>(`/auth/users/${userId}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify(userData),
+        });
+    },
+
+    async deleteUser(userId: string, token?: string): Promise<void> {
+        const headers: HeadersInit = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        return authRequest<void>(`/auth/users/${userId}`, {
+            method: 'DELETE',
+            headers,
+        });
+    },
+
+    async changePassword(currentPassword: string, newPassword: string, token?: string): Promise<{ message: string }> {
+        const headers: HeadersInit = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        return authRequest<{ message: string }>('/auth/change-password', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                current_password: currentPassword,
+                new_password: newPassword,
+            }),
+        });
+    },
+
+    async adminChangeUserPassword(userId: string, newPassword: string, token?: string): Promise<{ message: string }> {
+        const headers: HeadersInit = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        return authRequest<{ message: string }>(`/auth/users/${userId}/change-password`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                new_password: newPassword,
+            }),
         });
     },
 };

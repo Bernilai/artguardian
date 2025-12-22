@@ -55,6 +55,12 @@ export const Login: React.FC = () => {
             [name]: value
         }));
 
+        // Clear custom validity for password field when user types
+        if (name === 'password') {
+            const passwordInput = e.target;
+            passwordInput.setCustomValidity("");
+        }
+
         if (errors[name]) {
             setErrors(prev => ({
                 ...prev,
@@ -68,20 +74,42 @@ export const Login: React.FC = () => {
         setMessage('');
         setErrors({});
 
-        if (!validateForm()) {
+        // Validate password using native HTML5 validation
+        const passwordInput = document.getElementById('password') as HTMLInputElement;
+        if (passwordInput) {
+            const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:'",.<>?/\\|`~]{8,32}$/;
+            if (!formData.password) {
+                passwordInput.setCustomValidity("Введите пароль");
+            } else if (formData.password.length < 8 || formData.password.length > 32) {
+                passwordInput.setCustomValidity("Пароль должен содержать от 8 до 32 символов");
+            } else if (!passwordPattern.test(formData.password) || formData.password.includes(' ')) {
+                passwordInput.setCustomValidity("Пароль содержит недопустимые символы или пробелы");
+            } else {
+                passwordInput.setCustomValidity("");
+            }
+            
+            if (!passwordInput.reportValidity()) {
+                return;
+            }
+        }
+
+        // Validate email (keep inline errors for email)
+        const emailPattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+        if (!formData.email.trim()) {
+            setErrors({ email: "Введите email" });
+            return;
+        } else if (!emailPattern.test(formData.email)) {
+            setErrors({ email: "Некорректный формат email" });
             return;
         }
 
         setIsLoading(true);
 
         try {
-            console.log("🔄 Attempting login...", formData);
             await login(formData.email, formData.password);
-            console.log("✅ Login successful in AuthContext");
-            console.log("🎯 Navigating to:", from);
             navigate(from, { replace: true });
         } catch (err: any) {
-            console.error("❌ Login error:", err);
+            console.error("Login error:", err);
             let errorText = "Ошибка при входе";
             if (err?.response) {
                 if (err.response.status === 401) {
@@ -141,8 +169,9 @@ export const Login: React.FC = () => {
                             onChange={handleChange}
                             required
                             disabled={isLoading}
+                            minLength={8}
+                            maxLength={32}
                         />
-                        {errors.password && <span className="field-error">{errors.password}</span>}
                     </div>
 
                     <Button

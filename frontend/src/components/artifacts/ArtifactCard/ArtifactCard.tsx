@@ -33,7 +33,25 @@ const ArtifactCard: React.FC<ArtifactCardProps> = ({
         onInspect?.(artifact);
     };
 
-    const mainImage = artifact.images[0] || '/images/placeholder-artifact.jpg';
+    // Handle images array - ensure it's always an array and has at least one image
+    const images = Array.isArray(artifact.images) ? artifact.images : [];
+    
+    // Helper to get full image URL
+    const getImageUrl = (imagePath: string): string => {
+        if (!imagePath) return '/images/placeholder-artifact.jpg';
+        // If it's already a full URL, use it
+        if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+            return imagePath;
+        }
+        // If it starts with /, it's an absolute path
+        if (imagePath.startsWith('/')) {
+            return imagePath;
+        }
+        // Otherwise, treat as relative to public/images
+        return `/images/${imagePath}`;
+    };
+    
+    const mainImage = images.length > 0 && images[0] ? getImageUrl(images[0]) : '/images/placeholder-artifact.jpg';
 
     return (
         <div
@@ -96,7 +114,12 @@ const ArtifactCard: React.FC<ArtifactCardProps> = ({
             {artifact.collection}
           </span>
                     <span className="artifact-card__date">
-            {new Date(artifact.lastInspection).toLocaleDateString('ru-RU')}
+            {artifact.lastInspection && artifact.lastInspection !== '' 
+                ? (() => {
+                    const date = new Date(artifact.lastInspection);
+                    return isNaN(date.getTime()) ? artifact.lastInspection : date.toLocaleDateString('ru-RU');
+                })()
+                : 'Не указана'}
           </span>
                 </div>
 

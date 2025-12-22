@@ -21,4 +21,19 @@ export type {
     LoginCredentials,
     RegisterData,
     AuthResponse
-} from './auth'
+} from './auth';
+
+export type {
+    Ticket,
+    TicketStatus,
+    TicketPriority,
+    CreateTicketRequest,
+    UpdateTicketRequest
+} from './tickets';
+
+export type {
+    Notification,
+    NotificationPreferences,
+    NotificationPreferencesUpdate,
+    UnreadCountResponse
+} from './notifications';

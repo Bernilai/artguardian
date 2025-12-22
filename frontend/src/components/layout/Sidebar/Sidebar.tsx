@@ -1,17 +1,16 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "../../../contexts/AuthContext";
+import { getNavigationForRole } from "../../../types/navigation";
 import './Sidebar.css';
-
-const menuItems = [
-    { path: '/dashboard', label: 'Дашборд', icon: '📊' },
-    { path: '/collection', label: 'Коллекция', icon: '🖼️' },
-    { path: '/tickets', label: 'Тикеты', icon: '⚠️' },
-    { path: '/analytics', label: 'Аналитика', icon: '📈' },
-    { path: '/settings', label: 'Настройки', icon: '⚙️' },
-];
 
 const Sidebar: React.FC = () => {
     const location = useLocation();
+    const { user } = useAuth();
+    
+    // Get navigation items filtered by user role
+    const userRole = (user?.role || 'viewer') as 'admin' | 'curator' | 'restorer' | 'viewer';
+    const menuItems = getNavigationForRole(userRole);
 
     return (
         <nav className="sidebar">

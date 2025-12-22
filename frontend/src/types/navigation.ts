@@ -1,35 +1,31 @@
-// Основные маршруты приложения
 export type AppRoute =
-    | '/'                    // Главная (редирект на дашборд)
-    | '/dashboard'           // Дашборд
-    | '/collection'          // Коллекция артефактов
-    | '/collection/:id'      // Детали артефакта
-    | '/tickets'             // Реставрационные тикеты
-    | '/tickets/:id'         // Детали тикета
-    | '/analytics'           // Аналитика
-    | '/settings'            // Настройки
-    | '/profile'             // Профиль пользователя
-    | '/help';               // Помощь
+    | '/'
+    | '/dashboard'
+    | '/collection'
+    | '/collection/:id'
+    | '/tickets'
+    | '/tickets/:id'
+    | '/analytics'
+    | '/settings'
+    | '/profile'
+    | '/help';
 
-// Элемент навигации в боковом меню
 export interface NavigationItem {
     path: AppRoute;
     label: string;
     icon: string;
     description?: string;
-    children?: NavigationItem[]; // Подменю (если нужно)
-    requiredPermission?: string; // Права доступа (если нужно)
-    badge?: number; // Количество уведомлений (например, необработанные тикеты)
+    children?: NavigationItem[];
+    requiredPermission?: string;
+    badge?: number;
 }
 
-// Хлебные крошки
 export interface BreadcrumbItem {
     path: AppRoute;
     label: string;
     isCurrent?: boolean;
 }
 
-// Конфигурация навигации
 export const navigationConfig: NavigationItem[] = [
     {
         path: '/dashboard',
@@ -48,7 +44,7 @@ export const navigationConfig: NavigationItem[] = [
         label: 'Тикеты',
         icon: '⚠️',
         description: 'Реставрационные работы',
-        badge: 0 // Будет обновляться динамически
+        badge: 0
     },
     {
         path: '/analytics',
@@ -64,31 +60,27 @@ export const navigationConfig: NavigationItem[] = [
     }
 ];
 
-// Утилитарные типы для работы с маршрутизацией
 export type RouteParams = {
     [key: string]: string | number;
 };
 
-// Типы для активного маршрута
 export interface ActiveRoute {
     path: AppRoute;
     params: RouteParams;
     breadcrumbs: BreadcrumbItem[];
 }
 
-// Права доступа для навигации
 export type UserRole =
-    | 'admin'           // Администратор
-    | 'curator'         // Куратор
-    | 'restorer'        // Реставратор
-    | 'viewer';         // Наблюдатель (только просмотр)
+    | 'admin'
+    | 'curator'
+    | 'restorer'
+    | 'viewer';
 
 export interface NavigationPermission {
     role: UserRole;
     allowedRoutes: AppRoute[];
 }
 
-// Конфигурация прав доступа
 export const navigationPermissions: NavigationPermission[] = [
     {
         role: 'admin',
@@ -108,9 +100,6 @@ export const navigationPermissions: NavigationPermission[] = [
     }
 ];
 
-// Вспомогательные функции для работы с навигацией
-
-// Генерация хлебных крошек на основе текущего пути
 export const generateBreadcrumbs = (currentPath: string): BreadcrumbItem[] => {
     const paths = currentPath.split('/').filter(Boolean);
     const breadcrumbs: BreadcrumbItem[] = [
@@ -126,7 +115,6 @@ export const generateBreadcrumbs = (currentPath: string): BreadcrumbItem[] => {
         });
     });
 
-    // Помечаем последний элемент как текущий
     if (breadcrumbs.length > 0) {
         breadcrumbs[breadcrumbs.length - 1].isCurrent = true;
     }
@@ -134,7 +122,6 @@ export const generateBreadcrumbs = (currentPath: string): BreadcrumbItem[] => {
     return breadcrumbs;
 };
 
-// Получение читаемого названия для пути
 const getLabelForPath = (path: string): string => {
     const labels: Record<string, string> = {
         'dashboard': 'Дашборд',
@@ -149,25 +136,21 @@ const getLabelForPath = (path: string): string => {
     return labels[path] || path.charAt(0).toUpperCase() + path.slice(1);
 };
 
-// Проверка доступа пользователя к маршруту
 export const hasAccessToRoute = (userRole: UserRole, route: AppRoute): boolean => {
     const permission = navigationPermissions.find(p => p.role === userRole);
     return permission ? permission.allowedRoutes.includes(route) : false;
 };
 
-// Получение конфигурации навигации для роли пользователя
 export const getNavigationForRole = (userRole: UserRole): NavigationItem[] => {
     return navigationConfig.filter(item =>
         hasAccessToRoute(userRole, item.path)
     );
 };
 
-// Получение элемента навигации по пути
 export const getNavigationItem = (path: AppRoute): NavigationItem | undefined => {
     return navigationConfig.find(item => item.path === path);
 };
 
-// Обновление бейджа (количества уведомлений) для пункта меню
 export const updateNavigationBadge = (path: AppRoute, count: number): void => {
     const item = navigationConfig.find(item => item.path === path);
     if (item) {
@@ -175,7 +158,6 @@ export const updateNavigationBadge = (path: AppRoute, count: number): void => {
     }
 };
 
-// Экспорт типов для использования в компонентах
 export type {
     NavigationItem as INavigationItem,
     BreadcrumbItem as IBreadcrumbItem,

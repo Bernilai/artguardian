@@ -153,6 +153,15 @@
     }
 }
 
+.error-message {
+    background: #fee;
+    color: #c33;
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-md);
+    border-left: 4px solid #c33;
+}
+
 @media (max-width: 768px) {
     .dashboard {
         padding: var(--spacing-md);

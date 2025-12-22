@@ -2,12 +2,10 @@ import React from 'react';
 import './StatusBadge.css';
 
 export type StatusType =
-    | 'excellent'          // Отличное
     | 'good'               // Хорошее
     | 'requires_attention' // Требует внимания
     | 'critical'           // Критическое
     | 'under_restoration'  // На реставрации
-    | 'storage'            // В хранилище
     | 'exhibited'          // Экспонируется
     | 'open'               // Открыт (для тикетов)
     | 'in_progress'        // В работе (для тикетов)
@@ -21,11 +19,6 @@ export interface StatusBadgeProps {
 }
 
 const statusConfig = {
-    excellent: {
-        label: 'Отличное',
-        className: 'status--excellent',
-        icon: '✅'
-    },
     good: {
         label: 'Хорошее',
         className: 'status--good',
@@ -45,11 +38,6 @@ const statusConfig = {
         label: 'На реставрации',
         className: 'status--restoration',
         icon: '🔧'
-    },
-    storage: {
-        label: 'В хранилище',
-        className: 'status--storage',
-        icon: '📦'
     },
     exhibited: {
         label: 'Экспонируется',
@@ -79,7 +67,34 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({
                                                      showIcon = true,
                                                      className = ''
                                                  }) => {
-    const config = statusConfig[status];
+    // Map backend status values to frontend status types
+    const statusMap: Record<string, StatusType> = {
+        'no_defects': 'good',
+        'has_defects': 'critical',
+        'requires_attention': 'requires_attention',
+        'under_restoration': 'under_restoration',
+        'exhibited': 'exhibited',
+        'good': 'good',
+        'critical': 'critical',
+        // Ticket statuses
+        'open': 'open',
+        'in_progress': 'in_progress',
+        'completed': 'completed'
+    };
+
+    // Normalize status to a known StatusType
+    const normalizedStatus = statusMap[status] || status as StatusType;
+    const config = statusConfig[normalizedStatus];
+
+    if (!config) {
+        // Fallback if config is still undefined
+        console.warn(`Unknown status: ${status}, using default`);
+        return (
+            <span className={`status-badge status-badge--${size} ${className}`}>
+                <span className="status-badge__label">{status}</span>
+            </span>
+        );
+    }
 
     return (
         <span

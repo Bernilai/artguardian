@@ -1,5 +1,11 @@
 export { apiService } from './api';
 export { authAPI, setRefreshCallback } from './authAPI';
 export { artifactsAPI } from './artifactsAPI';
-
-export { mockAuthAPI } from './mockAuth';
+export { imagesAPI } from './imagesAPI';
+export { ticketsAPI } from './ticketsAPI';
+export { dashboardAPI } from './dashboardAPI';
+export { analyticsAPI } from './analyticsAPI';
+export { notificationsAPI } from './notificationsAPI';
+export { systemAPI } from './systemAPI';
+export { autoDetectionAPI } from './autoDetectionAPI';
+export { aiPreferencesAPI } from './aiPreferencesAPI';

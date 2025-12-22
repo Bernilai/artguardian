@@ -1,0 +1,29 @@
+# ArtDet Model Dependencies
+# These are OPTIONAL dependencies for automatic damage detection
+# Install only if you want to use the automatic detection feature
+# Manual detection remains the primary method
+
+# Core ML libraries
+# Note: Python 3.12 requires TensorFlow 2.16+
+# H5 model format may have compatibility issues - service will handle gracefully
+tensorflow>=2.16.0,<2.17.0  # Python 3.12 compatible
+keras>=3.0.0,<4.0.0  # Keras 3.x for TensorFlow 2.16+
+numpy>=1.24.0,<1.27.0
+scikit-image>=0.20.0,<0.25.0
+scipy>=1.9.0,<1.14.0
+
+# Image processing
+opencv-python==4.10.0.84
+Pillow>=10.0.0,<11.0.0
+
+# Mask R-CNN (install from GitHub)
+# git clone https://github.com/alsombra/Mask_RCNN-TF2.git
+# cd Mask_RCNN-TF2
+# pip install -r requirements.txt
+# python setup.py install
+# mask-rcnn==2.1  # Install from the cloned repository
+
+# Additional dependencies
+h5py==3.11.0
+matplotlib==3.9.2
+

@@ -1,123 +1,102 @@
-// Типы дефектов
 export type DefectType =
-    | 'crack'          // Трещина
-    | 'stain'          // Пятно
-    | 'discoloration'  // Изменение цвета
-    | 'peeling'        // Отслоение
-    | 'deformation'    // Деформация
-    | 'abrasion'       // Истирание
-    | 'corrosion'      // Коррозия
-    | 'break'          // Надлом
-    | 'other';         // Другое
+    | 'crack'
+    | 'stain'
+    | 'discoloration'
+    | 'peeling'
+    | 'deformation'
+    | 'abrasion'
+    | 'corrosion'
+    | 'break'
+    | 'other';
 
 export type DefectSeverity =
-    | 'low'      // Низкая
-    | 'medium'   // Средняя
-    | 'high'     // Высокая
-    | 'critical' // Критическая
+    | 'low'
+    | 'medium'
+    | 'high'
+    | 'critical'
 
 export interface Defect {
     id: string;
     type: DefectType;
     severity: DefectSeverity;
-    location: string; // Описание местоположения или координаты
+    location: string;
     description?: string;
-    detectedDate: string; // ISO string даты обнаружения
-    lastInspectionDate?: string; // ISO string даты последней проверки
-    progress: number; // Прогресс ухудшения в процентах (0-100)
-    images?: string[]; // Ссылки на фотографии дефекта
-    notes?: string; // Дополнительные заметки
-    isActive: boolean; // Активен ли дефект (или устранен)
+    detectedDate: string;
+    lastInspectionDate?: string;
+    progress: number;
+    images?: string[];
+    notes?: string;
+    isActive: boolean;
 }
 
-// Типы материалов
 export type MaterialType =
-    | 'oil_paint'      // Масляная краска
-    | 'watercolor'     // Акварель
-    | 'acrylic'        // Акрил
-    | 'tempera'        // Темпера
-    | 'canvas'         // Холст
-    | 'wood'           // Дерево
-    | 'metal'          // Металл
-    | 'stone'          // Камень
-    | 'ceramic'        // Керамика
-    | 'paper'          // Бумага
-    | 'textile'        // Текстиль
-    | 'mixed'          // Смешанная техника
-    | 'other';         // Другое
+    | 'oil_paint'
+    | 'watercolor'
+    | 'acrylic'
+    | 'tempera'
+    | 'canvas'
+    | 'wood'
+    | 'metal'
+    | 'stone'
+    | 'ceramic'
+    | 'paper'
+    | 'textile'
+    | 'mixed'
+    | 'other';
 
-// Статусы артефакта
 export type ArtifactStatus =
-    | 'excellent'          // Отличное
-    | 'good'               // Хорошее
-    | 'requires_attention' // Требует внимания
-    | 'critical'           // Критическое
-    | 'under_restoration'  // На реставрации
-    | 'storage'            // В хранилище
-    | 'exhibited'          // Экспонируется
+    | 'good'
+    | 'requires_attention'
+    | 'critical'
+    | 'under_restoration'
+    | 'exhibited';
 
-// Периоды создания
 export type HistoricalPeriod =
-    | 'ancient'           // Античность
-    | 'medieval'          // Средневековье
-    | 'renaissance'       // Возрождение
-    | 'baroque'           // Барокко
-    | 'classicism'        // Классицизм
-    | 'romanticism'       // Романтизм
-    | 'realism'           // Реализм
-    | 'impressionism'     // Импрессионизм
-    | 'modern'            // Модерн
-    | 'contemporary'      // Современное
-    | 'unknown'           // Неизвестно
+    | 'ancient'
+    | 'medieval'
+    | 'renaissance'
+    | 'baroque'
+    | 'classicism'
+    | 'romanticism'
+    | 'realism'
+    | 'impressionism'
+    | 'modern'
+    | 'contemporary'
+    | 'unknown';
 
-// Основной интерфейс артефакта
 export interface Artifact {
-    // Основная информация
     id: string;
     title: string;
     description: string;
-    inventoryNumber: string; // Инвентарный номер
-    collection: string; // Название коллекции
-
-    // Даты
-    creationDate: string; // Дата создания (может быть приблизительной "XVIII век")
-    acquisitionDate?: string; // Дата приобретения музеем
-
-    // Физические характеристики
+    inventoryNumber: string;
+    collection: string;
+    creationDate: string;
+    acquisitionDate?: string;
     dimensions: {
-        width: number; // см
-        height: number; // см
-        depth?: number; // см (для 3D объектов)
+        width: number;
+        height: number;
+        depth?: number;
         unit: 'cm' | 'mm' | 'm';
     };
-
     materials: MaterialType[];
-    weight?: number; // кг
-    technique?: string; // Техника исполнения
-
-    // Состояние и консервация
+    weight?: number;
+    technique?: string;
     status: ArtifactStatus;
-    currentLocation: string; // Местонахождение (зал, хранилище и т.д.)
+    currentLocation: string;
     restorationHistory: RestorationRecord[];
-    lastInspection: string; // Дата последней инспекции
-
-    // Медиа
-    images: string[]; // Ссылки на основные изображения
-    scans?: string[]; // Ссылки на сканы высокого разрешения
-    documents?: string[]; // Ссылки на сопроводительные документы
-
-    // Дефекты
+    lastInspection?: string;
+    lastInspector?: string;
+    images: string[];
+    scans?: string[];
+    documents?: string[];
     defects: Defect[];
-
-    // Метаданные
     tags: string[];
     notes?: string;
-    createdBy: string; // Кто добавил в систему
-    createdAt: string; // Когда добавлен в систему
-    updatedAt: string; // Когда последний раз обновлен
+    createdBy: string;
+    createdAt: string;
+    updatedAt: string;
 }
 
-// Запись о реставрации
 export interface RestorationRecord {
     id: string;
     date: string;
@@ -128,10 +107,9 @@ export interface RestorationRecord {
     duration?: number; // Продолжительность работ в днях
     beforeImages?: string[];
     afterImages?: string[];
-    cost?: number; // Стоимость работ
+    cost?: number;
 }
 
-// Фильтры для коллекции
 export interface ArtifactFilters {
     status?: ArtifactStatus[];
     materials?: MaterialType[];
@@ -145,7 +123,6 @@ export interface ArtifactFilters {
     };
 }
 
-// Пагинация
 export interface PaginationInfo {
     currentPage: number;
     totalPages: number;
@@ -153,14 +130,12 @@ export interface PaginationInfo {
     itemsPerPage: number;
 }
 
-// Ответ API для списка артефактов
 export interface ArtifactsResponse {
     artifacts: Artifact[];
     pagination: PaginationInfo;
     filters?: ArtifactFilters;
 }
 
-// Форма создания/редактирования артефакта
 export interface ArtifactFormData {
     title: string;
     description: string;
@@ -181,7 +156,6 @@ export interface ArtifactFormData {
     notes?: string;
 }
 
-// Статистика по коллекции
 export interface CollectionStats {
     total: number;
     byStatus: Record<ArtifactStatus, number>;
@@ -192,7 +166,6 @@ export interface CollectionStats {
     recentAdditions: number;
 }
 
-// Утилитарные типы для работы с изображениями
 export interface ImageAnalysisResult {
     artifactId: string;
     imageUrl: string;
@@ -200,16 +173,15 @@ export interface ImageAnalysisResult {
     segmentationData?: {
         regions: Array<{
             id: string;
-            label: string; // "sky", "drapery", "flesh", etc.
-            coordinates: number[][]; // Полигоны региона
+            label: string;
+            coordinates: number[][];
             material?: string;
         }>;
     };
     analysisDate: string;
-    confidence: number; // Уверенность анализа (0-1)
+    confidence: number;
 }
 
-// Типы для поиска
 export type SearchField =
     | 'title'
     | 'description'
@@ -223,7 +195,6 @@ export interface SearchParams {
     filters: ArtifactFilters;
 }
 
-// Экспорт всех типов
 export type {
     Defect as IDefect,
     Artifact as IArtifact,

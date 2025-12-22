@@ -1,0 +1,111 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: artguardian-postgres
+    ports:
+      - "5432:5432"  # Keep exposed for direct connections if needed
+    environment:
+      POSTGRES_USER: artguardian
+      POSTGRES_PASSWORD: artguardian123
+      POSTGRES_DB: artguardian
+      # Set locale to English to avoid encoding issues with error messages
+      POSTGRES_INITDB_ARGS: "--locale=en_US.UTF-8 --encoding=UTF8"
+      LC_ALL: en_US.UTF-8
+      LANG: en_US.UTF-8
+      # Force English for all messages
+      POSTGRES_INITDB_LOCALE: en_US.UTF-8
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U artguardian"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  pgbouncer:
+    image: pgbouncer/pgbouncer:latest
+    container_name: artguardian-pgbouncer
+    ports:
+      - "6432:6432"  # PgBouncer default port
+    volumes:
+      # Mount userlist.txt for authentication (read-only is fine)
+      - ./backend/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+      # Note: pgbouncer.ini is auto-generated from environment variables by the container
+    environment:
+      # Database connection (PgBouncer connects to PostgreSQL)
+      DATABASES_HOST: postgres
+      DATABASES_PORT: 5432
+      DATABASES_USER: artguardian
+      DATABASES_PASSWORD: artguardian123
+      DATABASES_DBNAME: artguardian
+      # PgBouncer settings
+      PGBOUNCER_LISTEN_ADDR: 0.0.0.0
+      PGBOUNCER_LISTEN_PORT: 6432
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_MAX_CLIENT_CONN: 1000
+      PGBOUNCER_DEFAULT_POOL_SIZE: 25
+      PGBOUNCER_MIN_POOL_SIZE: 5
+      PGBOUNCER_RESERVE_POOL_SIZE: 5
+      PGBOUNCER_RESERVE_POOL_TIMEOUT: 3
+      PGBOUNCER_MAX_DB_CONNECTIONS: 0
+      PGBOUNCER_MAX_USER_CONNECTIONS: 0
+      # Connection lifetime settings (to prevent premature connection closure)
+      PGBOUNCER_SERVER_LIFETIME: 7200  # 2 hours (increased from default 3600s)
+      PGBOUNCER_SERVER_IDLE_TIMEOUT: 1800  # 30 minutes (increased from default 600s)
+      # Authentication - use auth_query to verify passwords against PostgreSQL
+      PGBOUNCER_AUTH_TYPE: scram-sha-256
+      PGBOUNCER_AUTH_USER: artguardian
+      PGBOUNCER_AUTH_QUERY: SELECT usename, passwd FROM pg_shadow WHERE usename=$1
+      # Fallback to userlist.txt
+      PGBOUNCER_AUTH_FILE: /etc/pgbouncer/userlist.txt
+      # Admin settings
+      PGBOUNCER_ADMIN_USERS: artguardian
+      PGBOUNCER_STATS_USERS: artguardian
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: artguardian-pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@artguardian.ru
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  minio_data:
+  pgadmin_data:
