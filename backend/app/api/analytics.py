@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models import Artifact, Ticket, Detection, User
-from app.dependencies import get_current_active_user
+from app.dependencies import get_current_active_user, require_curator_or_admin
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +18,10 @@ router = APIRouter()
 
 @router.get("/overview")
 async def get_analytics_overview(
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_curator_or_admin),
     db: AsyncSession = Depends(get_db)
 ) -> Dict:
-    """Get comprehensive analytics overview"""
+    """Get comprehensive analytics overview (curator/admin only)"""
     
     # Artifact statistics by status
     status_counts_result = await db.execute(
@@ -131,10 +131,10 @@ async def get_analytics_overview(
 @router.get("/trends")
 async def get_analytics_trends(
     days: int = 30,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_curator_or_admin),
     db: AsyncSession = Depends(get_db)
 ) -> Dict:
-    """Get trends over time"""
+    """Get trends over time (curator/admin only)"""
     
     end_date = datetime.now(timezone.utc)
     start_date = end_date - timedelta(days=days)
@@ -209,10 +209,10 @@ async def get_analytics_trends(
 
 @router.get("/restoration")
 async def get_restoration_analytics(
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_curator_or_admin),
     db: AsyncSession = Depends(get_db)
 ) -> Dict:
-    """Get restoration-specific analytics"""
+    """Get restoration-specific analytics (curator/admin only)"""
     
     # Tickets by restorer
     tickets_by_restorer_result = await db.execute(

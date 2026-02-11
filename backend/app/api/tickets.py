@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models import Ticket, Artifact, User
 from app.schemas import TicketCreate, TicketUpdate, TicketResponse
-from app.dependencies import get_current_active_user
+from app.dependencies import get_current_active_user, require_restorer_curator_or_admin
 from app.models import User as UserModel
 from app.utils.notifications import (
     notify_ticket_assigned,
@@ -27,9 +27,10 @@ async def get_all_tickets(
     status_filter: Optional[str] = Query(None, alias="status"),
     assigned_to: Optional[str] = Query(None),
     artifact_id: Optional[str] = Query(None),
+    current_user: User = Depends(require_restorer_curator_or_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get all tickets with optional filters"""
+    """Get all tickets with optional filters (restorer/curator/admin only)"""
     query = select(Ticket).options(
         selectinload(Ticket.artifact),
         selectinload(Ticket.assigned_to),
@@ -76,9 +77,10 @@ async def get_all_tickets(
 @router.get("/{ticket_id}", response_model=TicketResponse)
 async def get_ticket(
     ticket_id: str,
+    current_user: User = Depends(require_restorer_curator_or_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get a single ticket by ID"""
+    """Get a single ticket by ID (restorer/curator/admin only)"""
     result = await db.execute(
         select(Ticket)
         .options(
@@ -120,10 +122,10 @@ async def get_ticket(
 @router.post("/", response_model=TicketResponse)
 async def create_ticket(
     ticket_data: TicketCreate,
-    current_user: UserModel = Depends(get_current_active_user),
+    current_user: UserModel = Depends(require_restorer_curator_or_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a new restoration ticket"""
+    """Create a new restoration ticket (restorer/curator/admin only)"""
     # Verify artifact exists
     artifact_result = await db.execute(
         select(Artifact).where(Artifact.id == ticket_data.artifact_id)
@@ -230,10 +232,10 @@ async def create_ticket(
 async def update_ticket(
     ticket_id: str,
     ticket_data: TicketUpdate,
-    current_user: UserModel = Depends(get_current_active_user),
+    current_user: UserModel = Depends(require_restorer_curator_or_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Update a ticket"""
+    """Update a ticket (restorer/curator/admin only)"""
     result = await db.execute(
         select(Ticket)
         .options(
