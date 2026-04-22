@@ -24,6 +24,8 @@ backend/app/artguardian.db
 
 # Environment variables
 .env
+.env.*
+!.env.example
 .env.local
 .env.*.local
 
