@@ -64,10 +64,17 @@ async def async_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, 
 
 
 async def _create_user(session: AsyncSession, role: str, suffix: str) -> User:
+    # Names must satisfy UserResponse / UserBase Russian-name validation used by auth responses.
+    role_names = {
+        "viewer": "Наблюдатель",
+        "admin": "Администратор",
+        "curator": "Куратор",
+        "restorer": "Реставратор",
+    }
     user = User(
         email=f"{role}_{suffix}@example.com",
         hashed_password=get_password_hash("testpassword123"),
-        name=f"{role.title()} User",
+        name=role_names.get(role, "Пользователь"),
         role=role,
         is_active=True,
     )
