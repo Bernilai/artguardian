@@ -1,3 +1,5 @@
+import type { PaginationInfo } from './artifacts';
+
 export type TicketStatus = 'open' | 'in_progress' | 'completed';
 export type TicketPriority = 'low' | 'medium' | 'high' | 'urgent';
 
@@ -37,5 +39,10 @@ export interface UpdateTicketRequest {
     priority?: TicketPriority;
     assigned_to_id?: string;
     notes?: string;
+}
+
+export interface TicketsResponse {
+    tickets: Ticket[];
+    pagination: PaginationInfo;
 }
 
