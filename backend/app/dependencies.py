@@ -63,3 +63,33 @@ async def get_optional_current_user(
     )
     user = result.scalar_one_or_none()
     return user
+
+
+async def require_admin(current_user: User = Depends(get_current_active_user)) -> User:
+    """Require admin role"""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can access this resource"
+        )
+    return current_user
+
+
+async def require_curator_or_admin(current_user: User = Depends(get_current_active_user)) -> User:
+    """Require curator or admin role"""
+    if current_user.role not in ["curator", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only curators and administrators can access this resource"
+        )
+    return current_user
+
+
+async def require_restorer_curator_or_admin(current_user: User = Depends(get_current_active_user)) -> User:
+    """Require restorer, curator, or admin role (excludes viewer)"""
+    if current_user.role not in ["restorer", "curator", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This resource is not available to viewers"
+        )
+    return current_user

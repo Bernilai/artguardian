@@ -10,7 +10,7 @@ from sqlalchemy import select, or_
 from app.database import get_db
 from app.models import Artifact
 from app.schemas import ArtifactCreate, ArtifactResponse
-from app.dependencies import get_current_active_user, get_optional_current_user
+from app.dependencies import get_current_active_user, get_optional_current_user, require_curator_or_admin
 from app.models import User
 from app.services.minio_service import minio_service
 from app.utils.notifications import (
@@ -132,10 +132,10 @@ async def get_artifact(
 @router.post("/", response_model=dict)
 async def create_artifact(
     artifact_data: ArtifactCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_curator_or_admin),
         db: AsyncSession = Depends(get_db)
 ) -> dict:
-    """Create a new artifact"""
+    """Create a new artifact (curator/admin only)"""
     try:
         result = await db.execute(
             select(Artifact).where(
@@ -207,10 +207,10 @@ async def create_artifact(
 async def update_artifact(
     artifact_id: str,
     artifact_data: ArtifactCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_curator_or_admin),
         db: AsyncSession = Depends(get_db)
 ) -> dict:
-    """Update an existing artifact"""
+    """Update an existing artifact (curator/admin only)"""
     try:
         result = await db.execute(select(Artifact).where(Artifact.id == artifact_id))
         artifact = result.scalar_one_or_none()
@@ -303,10 +303,10 @@ async def update_artifact(
 @router.delete("/{artifact_id}")
 async def delete_artifact(
     artifact_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_curator_or_admin),
         db: AsyncSession = Depends(get_db)
 ):
-    """Delete an artifact"""
+    """Delete an artifact (curator/admin only)"""
     try:
         result = await db.execute(select(Artifact).where(Artifact.id == artifact_id))
         artifact = result.scalar_one_or_none()
