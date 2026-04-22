@@ -23,6 +23,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _session_database_url(db: AsyncSession) -> str:
+    bind = db.get_bind()
+    if bind is None:
+        return str(engine.url)
+    return str(bind.url)
+
+
 @router.get("/info", response_model=Dict[str, Any])
 async def get_system_info(
     current_user: User = Depends(get_current_active_user),
@@ -35,8 +42,8 @@ async def get_system_info(
             detail="Only administrators can access system information"
         )
     
-    # Get database type
-    database_url = str(engine.url)
+    # Get database type (use session bind so tests that override get_db see the test engine)
+    database_url = _session_database_url(db)
     is_postgres = "postgresql" in database_url.lower()
     is_sqlite = "sqlite" in database_url.lower()
     
@@ -154,9 +161,14 @@ async def create_backup(
             detail="Only administrators can create backups"
         )
     
-    database_url = str(engine.url)
+    database_url = _session_database_url(db)
     is_postgres = "postgresql" in database_url.lower()
-    
+    if not is_postgres:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Backup creation requires PostgreSQL (pg_dump); SQLite and other databases are not supported.",
+        )
+
     # Create backup directory if it doesn't exist
     backend_dir = Path(__file__).parent.parent.parent
     backups_dir = backend_dir / "backups"
