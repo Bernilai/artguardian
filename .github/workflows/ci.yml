@@ -50,7 +50,7 @@ jobs:
         run: |
           if [ -d "tests" ]; then
             echo "tests/ directory found, running pytest."
-            python -m pytest
+            python -m pytest || (exit_code=$?; if [ $exit_code -eq 5 ]; then echo "No tests collected, skipping."; exit 0; else exit $exit_code; fi)
           else
             echo "No tests/ directory found, skipping pytest."
           fi

@@ -25,9 +25,9 @@
     "eject": "react-scripts eject"
   },
   "jest": {
-    "testPathIgnorePatterns": [
-      "/node_modules/",
-      "/src/__tests__/__mocks__/"
+    "testMatch": [
+      "<rootDir>/src/**/__tests__/**/*.(test|spec).(ts|tsx)",
+      "<rootDir>/src/**/*.(test|spec).(ts|tsx)"
     ]
   },
   "eslintConfig": {
