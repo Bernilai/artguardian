@@ -260,6 +260,41 @@ class TicketResponse(TicketBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+# Pagination schemas (used by list endpoints)
+class PaginationInfo(BaseModel):
+    currentPage: int
+    totalPages: int
+    totalItems: int
+    itemsPerPage: int
+
+
+class PaginatedArtifactsResponse(BaseModel):
+    artifacts: List[dict]
+    pagination: PaginationInfo
+
+
+class PaginatedTicketsResponse(BaseModel):
+    tickets: List[TicketResponse]
+    pagination: PaginationInfo
+
+
+class PaginatedUsersResponse(BaseModel):
+    users: List[UserResponse]
+    pagination: PaginationInfo
+
+
+class BackupListItem(BaseModel):
+    filename: str
+    size: int
+    size_formatted: str
+    created_at: str
+
+
+class PaginatedBackupsResponse(BaseModel):
+    backups: List[BackupListItem]
+    pagination: PaginationInfo
+
+
 # Notification schemas
 class NotificationBase(BaseModel):
     type: str
@@ -333,3 +368,28 @@ class AIPreferencesResponse(AIPreferencesBase):
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# External museum reference (Met Museum API mirror for UI)
+class MuseumReferenceObject(BaseModel):
+    object_id: int
+    title: str
+    artist_display: Optional[str] = None
+    object_date: Optional[str] = None
+    primary_image_small: str
+    object_url: Optional[str] = None
+
+
+class MuseumInspirationResponse(BaseModel):
+    """Always HTTP 200; use `available` for UI graceful degradation.
+
+    Echo `seed` from a previous response to page within the same shuffled deck.
+    """
+
+    available: bool
+    source: str = "The Metropolitan Museum of Art — Collection API"
+    departments_count: Optional[int] = None
+    items: List[MuseumReferenceObject] = []
+    error_message: Optional[str] = None
+    seed: Optional[str] = None
+    pagination: Optional[PaginationInfo] = None

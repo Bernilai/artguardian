@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import OperationalError
 
-from app.api import artifacts, auth, defect_detection, tickets, images, dashboard, analytics, notifications, system, auto_detection, ai_preferences
+from app.api import artifacts, auth, defect_detection, tickets, images, dashboard, analytics, notifications, system, auto_detection, ai_preferences, museum_reference, seo as seo_routes
 from app.config import settings
 from app.database import Base, engine
 
@@ -113,6 +113,8 @@ app.include_router(notifications.router, prefix="/api/notifications", tags=["not
 app.include_router(system.router, prefix="/api/system", tags=["system"])
 app.include_router(auto_detection.router, prefix="/api/auto-detection", tags=["auto_detection"])
 app.include_router(ai_preferences.router, prefix="/api/ai", tags=["ai_preferences"])
+app.include_router(museum_reference.router, prefix="/api/museum", tags=["museum_reference"])
+app.include_router(seo_routes.router)
 
 @app.get("/")
 async def root():

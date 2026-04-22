@@ -1,6 +1,10 @@
 // src/components/artifacts/ArtifactCard/ArtifactCard.tsx
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {Artifact} from "../../../types";
+import {
+    FALLBACK_ARTIFACT_IMAGE_SRC,
+    primaryArtifactImageUrl,
+} from '../artifactImageUrl';
 import StatusBadge from "../../ui/StatusBadge/StatusBadge";
 import './ArtifactCard.css';
 
@@ -33,25 +37,16 @@ const ArtifactCard: React.FC<ArtifactCardProps> = ({
         onInspect?.(artifact);
     };
 
-    // Handle images array - ensure it's always an array and has at least one image
-    const images = Array.isArray(artifact.images) ? artifact.images : [];
-    
-    // Helper to get full image URL
-    const getImageUrl = (imagePath: string): string => {
-        if (!imagePath) return '/images/placeholder-artifact.jpg';
-        // If it's already a full URL, use it
-        if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-            return imagePath;
-        }
-        // If it starts with /, it's an absolute path
-        if (imagePath.startsWith('/')) {
-            return imagePath;
-        }
-        // Otherwise, treat as relative to public/images
-        return `/images/${imagePath}`;
-    };
-    
-    const mainImage = images.length > 0 && images[0] ? getImageUrl(images[0]) : '/images/placeholder-artifact.jpg';
+    const primaryUrl = useMemo(() => primaryArtifactImageUrl(artifact), [artifact.id, artifact.images]);
+    const [displaySrc, setDisplaySrc] = useState(() => primaryUrl ?? FALLBACK_ARTIFACT_IMAGE_SRC);
+
+    useEffect(() => {
+        setDisplaySrc(primaryUrl ?? FALLBACK_ARTIFACT_IMAGE_SRC);
+    }, [artifact.id, primaryUrl]);
+
+    const onImgError = useCallback(() => {
+        setDisplaySrc((prev) => (prev === FALLBACK_ARTIFACT_IMAGE_SRC ? prev : FALLBACK_ARTIFACT_IMAGE_SRC));
+    }, []);
 
     return (
         <div
@@ -67,13 +62,12 @@ const ArtifactCard: React.FC<ArtifactCardProps> = ({
         >
             <div className="artifact-card__image-container">
                 <img
-                    src={mainImage}
+                    src={displaySrc}
                     alt={artifact.title}
                     className="artifact-card__image"
-                    onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = '/images/placeholder-artifact.jpg';
-                    }}
+                    loading="lazy"
+                    decoding="async"
+                    onError={onImgError}
                 />
                 <div className="artifact-card__status">
                     <StatusBadge status={artifact.status} size="small" />

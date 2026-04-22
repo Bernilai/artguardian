@@ -1,6 +1,11 @@
 import { API_BASE_URL } from './config';
 import { apiService } from './api';
-import { AuthResponse, User, LoginCredentials, RegisterData } from '../types';
+import { AuthResponse, User, LoginCredentials, RegisterData, PaginationInfo } from '../types';
+
+export interface PaginatedUsersResponse {
+    users: User[];
+    pagination: PaginationInfo;
+}
 
 let refreshCallback: (() => Promise<string>) | null = null;
 
@@ -86,7 +91,12 @@ export const authAPI = {
         });
     },
 
-    async getUsers(role?: string, includeInactive?: boolean, token?: string): Promise<User[]> {
+    async getUsers(
+        role?: string,
+        includeInactive?: boolean,
+        token?: string,
+        opts?: { page?: number; pageSize?: number }
+    ): Promise<PaginatedUsersResponse> {
         const headers: HeadersInit = {};
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
@@ -95,9 +105,11 @@ export const authAPI = {
         const params = new URLSearchParams();
         if (role) params.append('role', role);
         if (includeInactive) params.append('include_inactive', 'true');
-        
+        if (opts?.page != null) params.append('page', String(opts.page));
+        if (opts?.pageSize != null) params.append('pageSize', String(opts.pageSize));
+
         const url = params.toString() ? `/auth/users?${params}` : '/auth/users';
-        return authRequest<User[]>(url, {
+        return authRequest<PaginatedUsersResponse>(url, {
             method: 'GET',
             headers,
         });

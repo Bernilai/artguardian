@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { authAPI, notificationsAPI, systemAPI, autoDetectionAPI, aiPreferencesAPI } from '../../services';
-import { User, NotificationPreferences } from '../../types';
-import { LoadingSpinner, Button } from '../../components';
+import { User, NotificationPreferences, PaginationInfo } from '../../types';
+import { LoadingSpinner, Button, ListPaginationBar, Seo } from '../../components';
 import type { SystemInfo, PerformanceStats, Backup } from '../../services/systemAPI';
 import './Settings.css';
 
@@ -15,6 +15,9 @@ const Settings: React.FC = () => {
     
     // Users tab state
     const [users, setUsers] = useState<User[]>([]);
+    const [usersPagination, setUsersPagination] = useState<PaginationInfo | null>(null);
+    const [usersPage, setUsersPage] = useState(1);
+    const [usersPageSize, setUsersPageSize] = useState(10);
     const [usersLoading, setUsersLoading] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [showUserForm, setShowUserForm] = useState(false);
@@ -33,6 +36,9 @@ const Settings: React.FC = () => {
     const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
     const [performanceStats, setPerformanceStats] = useState<PerformanceStats | null>(null);
     const [backups, setBackups] = useState<Backup[]>([]);
+    const [backupsPagination, setBackupsPagination] = useState<PaginationInfo | null>(null);
+    const [backupPage, setBackupPage] = useState(1);
+    const [backupPageSize, setBackupPageSize] = useState(10);
     const [systemLoading, setSystemLoading] = useState(false);
     const [backupCreating, setBackupCreating] = useState(false);
     
@@ -63,16 +69,26 @@ const Settings: React.FC = () => {
     ];
 
     useEffect(() => {
-        if (activeTab === 'users' && accessToken) {
-            loadUsers();
-        } else if (activeTab === 'notifications' && accessToken) {
+        if (activeTab === 'notifications' && accessToken) {
             loadNotificationPreferences();
-        } else if (activeTab === 'system' && accessToken && currentUser?.role === 'admin') {
-            loadSystemData();
         } else if (activeTab === 'ai' && accessToken) {
             loadAIPreferences();
         }
-    }, [activeTab, accessToken, includeInactive, currentUser?.role]);
+    }, [activeTab, accessToken]);
+
+    useEffect(() => {
+        setUsersPage(1);
+    }, [includeInactive]);
+
+    useEffect(() => {
+        if (activeTab !== 'users' || !accessToken) return;
+        loadUsers();
+    }, [activeTab, accessToken, includeInactive, usersPage, usersPageSize]);
+
+    useEffect(() => {
+        if (activeTab !== 'system' || !accessToken || currentUser?.role !== 'admin') return;
+        loadSystemData();
+    }, [activeTab, accessToken, currentUser?.role, backupPage, backupPageSize]);
 
     const loadNotificationPreferences = async () => {
         if (!accessToken) return;
@@ -127,8 +143,12 @@ const Settings: React.FC = () => {
         try {
             setUsersLoading(true);
             setError(null);
-            const usersList = await authAPI.getUsers(undefined, includeInactive, accessToken);
-            setUsers(usersList);
+            const resp = await authAPI.getUsers(undefined, includeInactive, accessToken, {
+                page: usersPage,
+                pageSize: usersPageSize,
+            });
+            setUsers(resp.users);
+            setUsersPagination(resp.pagination);
         } catch (err) {
             console.error('Failed to load users:', err);
             setError('Не удалось загрузить пользователей');
@@ -261,14 +281,15 @@ const Settings: React.FC = () => {
         try {
             setSystemLoading(true);
             setError(null);
-            const [info, stats, backupsList] = await Promise.all([
+            const [info, stats, backupsResp] = await Promise.all([
                 systemAPI.getSystemInfo(accessToken),
                 systemAPI.getPerformanceStats(accessToken),
-                systemAPI.listBackups(accessToken)
+                systemAPI.listBackups(accessToken, { page: backupPage, pageSize: backupPageSize }),
             ]);
             setSystemInfo(info);
             setPerformanceStats(stats);
-            setBackups(backupsList);
+            setBackups(backupsResp.backups);
+            setBackupsPagination(backupsResp.pagination);
         } catch (err: any) {
             console.error('Error loading system data:', err);
             setError('Не удалось загрузить системную информацию');
@@ -280,7 +301,7 @@ const Settings: React.FC = () => {
     const handleCreateBackup = async () => {
         if (!accessToken) return;
         
-        if (!window.confirm('Создать резервную копию базы данных? Это может занять некоторое время.')) {
+        if (!window.confirm('Создать резервную копию базы данных и MinIO? Это может занять некоторое время.')) {
             return;
         }
         
@@ -292,8 +313,10 @@ const Settings: React.FC = () => {
             setSuccess(`Резервная копия создана: ${backup.filename} (${backup.size_formatted})`);
             setTimeout(() => setSuccess(null), 5000);
             // Reload backups list
-            const backupsList = await systemAPI.listBackups(accessToken);
-            setBackups(backupsList);
+            setBackupPage(1);
+            const backupsResp = await systemAPI.listBackups(accessToken, { page: 1, pageSize: backupPageSize });
+            setBackups(backupsResp.backups);
+            setBackupsPagination(backupsResp.pagination);
         } catch (err: any) {
             console.error('Error creating backup:', err);
             const errorMessage = err?.message || (typeof err === 'string' ? err : 'Не удалось создать резервную копию');
@@ -380,6 +403,12 @@ const Settings: React.FC = () => {
 
     return (
         <div className="settings-page">
+            <Seo
+                title="Настройки"
+                description="Настройки ArtGuardian: пользователи, уведомления, резервное копирование и ИИ-анализ."
+                canonicalPath="/settings"
+                noIndex
+            />
             <div className="page-header">
                 <h1>Настройки системы</h1>
                 <p className="page-description">
@@ -491,7 +520,8 @@ const Settings: React.FC = () => {
                                 {usersLoading ? (
                                     <LoadingSpinner text="Загрузка пользователей..." />
                                 ) : (
-                                    <div className="users-table-container">
+                                    <>
+                                <div className="users-table-container">
                                         <table className="users-table">
                                             <thead>
                                                 <tr>
@@ -504,7 +534,7 @@ const Settings: React.FC = () => {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {users.length === 0 ? (
+                                                {(usersPagination?.totalItems ?? 0) === 0 ? (
                                                     <tr>
                                                         <td colSpan={6} className="no-data">
                                                             Нет пользователей
@@ -650,6 +680,21 @@ const Settings: React.FC = () => {
                                             </tbody>
                                         </table>
                                     </div>
+                                    {usersPagination && (
+                                        <ListPaginationBar
+                                            pagination={usersPagination}
+                                            page={usersPage}
+                                            onPageChange={setUsersPage}
+                                            pageSize={usersPageSize}
+                                            onPageSizeChange={(n) => {
+                                                setUsersPageSize(n);
+                                                setUsersPage(1);
+                                            }}
+                                            pageSizeOptions={[5, 10, 20, 50]}
+                                            showTotalCount
+                                        />
+                                    )}
+                                    </>
                                 )}
                             </div>
                         )}
@@ -1117,11 +1162,12 @@ const Settings: React.FC = () => {
                                                 Резервные копии сохраняются в директории <code>backend/backups</code>
                                             </p>
                                             
-                                            {backups.length === 0 ? (
+                                            {(!backupsPagination || backupsPagination.totalItems === 0) ? (
                                                 <div className="system-info-empty">
                                                     <p>Резервные копии не найдены</p>
                                                 </div>
                                             ) : (
+                                                <>
                                                 <div className="backups-table-container">
                                                     <table className="backups-table">
                                                         <thead>
@@ -1144,6 +1190,21 @@ const Settings: React.FC = () => {
                                                         </tbody>
                                                     </table>
                                                 </div>
+                                                    {backupsPagination && (
+                                                        <ListPaginationBar
+                                                            pagination={backupsPagination}
+                                                            page={backupPage}
+                                                            onPageChange={setBackupPage}
+                                                            pageSize={backupPageSize}
+                                                            onPageSizeChange={(n) => {
+                                                                setBackupPageSize(n);
+                                                                setBackupPage(1);
+                                                            }}
+                                                            pageSizeOptions={[5, 10, 20, 50]}
+                                                            showTotalCount
+                                                        />
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     </>

@@ -1,0 +1,1 @@
+export { MuseumInspirationPanel } from './MuseumInspirationPanel';

@@ -1,5 +1,5 @@
 import { apiService } from './api';
-import { Artifact } from '../types';
+import { Artifact, ArtifactStatus, ArtifactsResponse } from '../types';
 
 // Type for creating artifact (matches backend schema)
 export interface CreateArtifactRequest {
@@ -16,9 +16,32 @@ export interface CreateArtifactRequest {
 }
 
 export const artifactsAPI = {
-    async fetchArtifacts(searchQuery?: string, token?: string): Promise<Artifact[]> {
-        const params = searchQuery ? { q: searchQuery } : {};
-        return apiService.getWithParams<Artifact[]>('/artifacts', params, token);
+    async fetchArtifacts(
+        params?: {
+            q?: string;
+            status?: ArtifactStatus | 'all';
+            collection?: string;
+            page?: number;
+            pageSize?: number;
+            sortBy?: 'created_at' | 'title' | 'status';
+            sortDir?: 'asc' | 'desc';
+        },
+        token?: string,
+        signal?: AbortSignal
+    ): Promise<ArtifactsResponse> {
+        const queryParams: Record<string, any> = {};
+
+        if (params?.q) queryParams.q = params.q;
+        if (params?.status && params.status !== 'all') queryParams.status = params.status;
+        if (params?.collection) queryParams.collection = params.collection;
+
+        if (params?.page !== undefined) queryParams.page = params.page;
+        if (params?.pageSize !== undefined) queryParams.pageSize = params.pageSize;
+        if (params?.sortBy) queryParams.sortBy = params.sortBy;
+        if (params?.sortDir) queryParams.sortDir = params.sortDir;
+
+        // Trailing slash avoids Starlette 307 redirect to /artifacts/ (doubles requests in DevTools).
+        return apiService.getWithParams<ArtifactsResponse>('/artifacts/', queryParams, token, signal);
     },
 
     async fetchArtifactById(id: string, token?: string): Promise<Artifact> {

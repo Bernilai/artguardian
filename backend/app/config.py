@@ -40,4 +40,24 @@ class Settings:
     MINIO_REGION: str = os.getenv("MINIO_REGION", "us-east-1")
     MINIO_PUBLIC_URL: str = os.getenv("MINIO_PUBLIC_URL", f"http://{MINIO_ENDPOINT}/{MINIO_BUCKET_NAME}")
 
+    # Public frontend URL (canonical links, sitemap, robots); trailing slash stripped at use site
+    PUBLIC_SITE_URL: str = os.getenv("PUBLIC_SITE_URL", "http://localhost:3000").rstrip("/")
+
+    # The Met Collection API (no API key; rate-limit friendly usage only)
+    MET_MUSEUM_API_BASE_URL: str = os.getenv(
+        "MET_MUSEUM_API_BASE_URL",
+        "https://collectionapi.metmuseum.org/public/collection/v1",
+    ).rstrip("/")
+
+    # Seconds (httpx); increase if Met search is slow from your network
+    MET_MUSEUM_TIMEOUT: float = float(os.getenv("MET_MUSEUM_TIMEOUT", "20.0"))
+
+    # Max object IDs pulled from Met search for shuffle + pagination (balance: variety vs payload size)
+    MET_MUSEUM_INSPIRATION_POOL_CAP: int = int(os.getenv("MET_MUSEUM_INSPIRATION_POOL_CAP", "400"))
+    MET_MUSEUM_INSPIRATION_PAGE_SIZE_MAX: int = int(os.getenv("MET_MUSEUM_INSPIRATION_PAGE_SIZE_MAX", "24"))
+
+    # In-memory deck cache (per seed): stable order across pages; new deck = new seed.
+    MET_MUSEUM_DECK_CACHE_TTL_SEC: float = float(os.getenv("MET_MUSEUM_DECK_CACHE_TTL_SEC", "3600"))
+    MET_MUSEUM_DECK_CACHE_MAX: int = int(os.getenv("MET_MUSEUM_DECK_CACHE_MAX", "100"))
+
 settings = Settings()

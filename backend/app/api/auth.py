@@ -1,18 +1,29 @@
 import hashlib
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func, and_
 from starlette.requests import Request
 
 from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_active_user
 from app.models import User, RefreshToken
-from app.schemas import UserCreate, UserResponse, UserUpdate, LoginRequest, Token, RefreshTokenCreate, PasswordChange, AdminPasswordChange
+from app.schemas import (
+    UserCreate,
+    UserResponse,
+    UserUpdate,
+    LoginRequest,
+    Token,
+    RefreshTokenCreate,
+    PasswordChange,
+    AdminPasswordChange,
+    PaginatedUsersResponse,
+    PaginationInfo,
+)
 from app.utils.notifications import notify_password_changed
 from app.security import (
     verify_password, get_password_hash, create_access_token,
@@ -278,28 +289,48 @@ async def get_current_user_profile(current_user: User = Depends(get_current_acti
         )
 
 
-@router.get("/users", response_model=List[UserResponse])
+@router.get("/users", response_model=PaginatedUsersResponse)
 async def get_users(
     role: Optional[str] = Query(None),
     include_inactive: bool = Query(False, alias="include_inactive"),
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(20, ge=1, le=500, alias="pageSize"),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get list of users, optionally filtered by role"""
-    query = select(User)
-    
+    """Get list of users, optionally filtered by role (paginated)"""
+    conditions = []
     if not include_inactive:
-        query = query.where(User.is_active == True)
-    
+        conditions.append(User.is_active == True)
     if role:
-        query = query.where(User.role == role)
-    
-    query = query.order_by(User.name)
-    
+        conditions.append(User.role == role)
+
+    count_stmt = select(func.count()).select_from(User)
+    query = select(User).order_by(User.name)
+    if conditions:
+        filt = and_(*conditions)
+        count_stmt = count_stmt.where(filt)
+        query = query.where(filt)
+
+    total_items_result = await db.execute(count_stmt)
+    total_items_value = int(total_items_result.scalar_one() or 0)
+
+    total_pages = (total_items_value + pageSize - 1) // pageSize if total_items_value > 0 else 0
+    offset = (page - 1) * pageSize
+
+    query = query.offset(offset).limit(pageSize)
     result = await db.execute(query)
     users = result.scalars().all()
-    
-    return [UserResponse.model_validate(user) for user in users]
+
+    return PaginatedUsersResponse(
+        users=[UserResponse.model_validate(user) for user in users],
+        pagination=PaginationInfo(
+            currentPage=page,
+            totalPages=total_pages,
+            totalItems=total_items_value,
+            itemsPerPage=pageSize,
+        ),
+    )
 
 
 @router.put("/users/{user_id}", response_model=UserResponse)

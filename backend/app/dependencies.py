@@ -7,6 +7,8 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models import User
 from app.security import verify_access_token
+from app.config import settings
+from app.services.met_museum_service import MetMuseumService
 
 security = HTTPBearer()
 
@@ -83,6 +85,16 @@ async def require_curator_or_admin(current_user: User = Depends(get_current_acti
             detail="Only curators and administrators can access this resource"
         )
     return current_user
+
+
+def get_met_museum_service() -> MetMuseumService:
+    return MetMuseumService(
+        settings.MET_MUSEUM_API_BASE_URL,
+        timeout=settings.MET_MUSEUM_TIMEOUT,
+        pool_cap=settings.MET_MUSEUM_INSPIRATION_POOL_CAP,
+        deck_cache_ttl_sec=settings.MET_MUSEUM_DECK_CACHE_TTL_SEC,
+        deck_cache_max=settings.MET_MUSEUM_DECK_CACHE_MAX,
+    )
 
 
 async def require_restorer_curator_or_admin(current_user: User = Depends(get_current_active_user)) -> User:

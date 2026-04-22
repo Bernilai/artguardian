@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { authAPI } from '../../services';
-import { LoadingSpinner, Button } from '../../components';
+import { LoadingSpinner, Button, Seo } from '../../components';
 import './Profile.css';
 
 const Profile: React.FC = () => {
@@ -128,6 +128,12 @@ const Profile: React.FC = () => {
     if (!user) {
         return (
             <div className="profile-page">
+                <Seo
+                    title="Профиль"
+                    description="Профиль пользователя ArtGuardian."
+                    canonicalPath="/profile"
+                    noIndex
+                />
                 <div className="error-message">
                     <p>Пользователь не найден</p>
                 </div>
@@ -137,6 +143,12 @@ const Profile: React.FC = () => {
 
     return (
         <div className="profile-page">
+            <Seo
+                title="Мой профиль"
+                description="Данные аккаунта и смена пароля в ArtGuardian."
+                canonicalPath="/profile"
+                noIndex
+            />
             <div className="profile-header">
                 <h1>Мой профиль</h1>
             </div>

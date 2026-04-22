@@ -1,8 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { MetricCard, LoadingSpinner } from '../../components';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { MetricCard, LoadingSpinner, Seo } from '../../components';
 import { useAuth } from '../../contexts/AuthContext';
 import { dashboardAPI } from '../../services';
 import './Dashboard.css';
+
+const MuseumInspirationPanel = lazy(() =>
+    import('../../components/museum/MuseumInspirationPanel').then((m) => ({
+        default: m.MuseumInspirationPanel,
+    }))
+);
 
 const Dashboard: React.FC = () => {
     const { accessToken } = useAuth();
@@ -59,6 +65,11 @@ const Dashboard: React.FC = () => {
     if (loading) {
         return (
             <div className="dashboard">
+                <Seo
+                    title="Дашборд"
+                    description="Сводка по коллекции артефактов, рискам и открытым тикетам в ArtGuardian."
+                    canonicalPath="/dashboard"
+                />
                 <h1 className="dashboard__title">Дашборд</h1>
                 <LoadingSpinner text="Загрузка данных..." />
             </div>
@@ -68,6 +79,11 @@ const Dashboard: React.FC = () => {
     if (error) {
         return (
             <div className="dashboard">
+                <Seo
+                    title="Дашборд"
+                    description="Сводка по коллекции артефактов, рискам и открытым тикетам в ArtGuardian."
+                    canonicalPath="/dashboard"
+                />
                 <h1 className="dashboard__title">Дашборд</h1>
                 <div className="error-message">{error}</div>
             </div>
@@ -76,6 +92,17 @@ const Dashboard: React.FC = () => {
 
     return (
         <div className="dashboard">
+            <Seo
+                title="Дашборд"
+                description="Сводка по коллекции артефактов, рискам и открытым тикетам в ArtGuardian."
+                canonicalPath="/dashboard"
+                jsonLd={{
+                    '@context': 'https://schema.org',
+                    '@type': 'WebPage',
+                    name: 'Дашборд ArtGuardian',
+                    description: 'Обзор метрик коллекции и тикетов реставрации.',
+                }}
+            />
             <h1 className="dashboard__title">Дашборд</h1>
 
             <div className="metrics-grid">
@@ -112,6 +139,10 @@ const Dashboard: React.FC = () => {
                     icon="🎫"
                 />
             </div>
+
+            <Suspense fallback={null}>
+                <MuseumInspirationPanel />
+            </Suspense>
         </div>
     );
 };

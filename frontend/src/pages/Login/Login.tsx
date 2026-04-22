@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts';
-import { Button } from '../../components';
+import { Button, Seo } from '../../components';
+import { getCanonicalOrigin } from '../../utils/siteUrl';
 import './Login.css';
 
 export const Login: React.FC = () => {
@@ -134,11 +135,26 @@ export const Login: React.FC = () => {
         }
     };
 
+    const siteUrl = getCanonicalOrigin();
+
     return (
         <div className="login-container">
+            <Seo
+                title="Вход"
+                description="Войдите в ArtGuardian — учёт артефактов, тикетов реставрации и аналитики музейной коллекции."
+                canonicalPath="/login"
+                jsonLd={{
+                    '@context': 'https://schema.org',
+                    '@type': 'WebSite',
+                    name: 'ArtGuardian',
+                    url: `${siteUrl}/`,
+                    description:
+                        'Платформа для учёта музейных артефактов, тикетов реставрации и аналитики состояния коллекций.',
+                }}
+            />
             <div className="login-form">
-                <h1>ArtGuardian</h1>
-                <h2>Вход в систему</h2>
+                <p className="login-brand" translate="no">ArtGuardian</p>
+                <h1>Вход в систему</h1>
 
                 {errors.submit && <div className="login-error">{errors.submit}</div>}
                 {message && <div className="login-message">{message}</div>}

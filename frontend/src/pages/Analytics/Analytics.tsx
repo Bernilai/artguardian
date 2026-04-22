@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { analyticsAPI } from '../../services';
-import { LoadingSpinner } from '../../components';
+import { LoadingSpinner, Seo } from '../../components';
 import './Analytics.css';
 
 interface AnalyticsData {
@@ -140,6 +140,11 @@ const Analytics: React.FC = () => {
     if (loading) {
         return (
             <div className="analytics-page">
+                <Seo
+                    title="Аналитика"
+                    description="Аналитика коллекции и реставрации: тренды, обзор и отчёты ArtGuardian."
+                    canonicalPath="/analytics"
+                />
                 <div className="page-header">
                     <h1>Аналитика</h1>
                 </div>
@@ -151,6 +156,11 @@ const Analytics: React.FC = () => {
     if (error) {
         return (
             <div className="analytics-page">
+                <Seo
+                    title="Аналитика"
+                    description="Аналитика коллекции и реставрации: тренды, обзор и отчёты ArtGuardian."
+                    canonicalPath="/analytics"
+                />
                 <div className="page-header">
                     <h1>Аналитика</h1>
                 </div>
@@ -167,6 +177,11 @@ const Analytics: React.FC = () => {
 
     return (
         <div className="analytics-page">
+            <Seo
+                title="Аналитика"
+                description="Аналитика коллекции и реставрации: тренды, обзор и отчёты ArtGuardian."
+                canonicalPath="/analytics"
+            />
             <div className="page-header">
                 <h1>Аналитика</h1>
                 <div className="page-controls">

@@ -77,11 +77,9 @@ class MetMuseumService:
         self.deck_cache_ttl_sec = max(60.0, deck_cache_ttl_sec)
         self.deck_cache_max = max(1, min(deck_cache_max, 10_000))
 
-        # Gather more search IDs than deck size so we can drop non-illustrated hits and still fill the deck.
         self._candidate_factor: int = 5
         self._candidate_cap_max: int = 3000
         self._resolve_concurrency: int = 12
-        # Hard cap on /objects calls when building one deck (avoids multi-minute first loads + rate limits).
         self._max_object_fetches_per_deck: int = min(480, max(240, self.pool_cap * 2))
 
     def _client(self) -> httpx.AsyncClient:

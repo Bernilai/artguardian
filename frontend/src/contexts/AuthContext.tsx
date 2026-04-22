@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef, useCallback, useMemo } from 'react';
 import { authAPI, setRefreshCallback } from '../services/authAPI';
 import { User, AuthResponse } from '../types';
 
@@ -30,7 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const refreshPromiseRef = useRef<Promise<AuthResponse> | null>(null);
     const initializedRef = useRef(false);
 
-    const refreshTokens = async (): Promise<string> => {
+    const refreshTokens = useCallback(async (): Promise<string> => {
         if (refreshPromiseRef.current) {
             const response = await refreshPromiseRef.current;
             return response.access_token;
@@ -51,11 +51,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } finally {
             refreshPromiseRef.current = null;
         }
-    };
+    }, []);
 
     useEffect(() => {
         setRefreshCallback(refreshTokens);
-    }, []);
+    }, [refreshTokens]);
 
     useEffect(() => {
         if (initializedRef.current) return;
@@ -79,7 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    const login = async (email: string, password: string) => {
+    const login = useCallback(async (email: string, password: string) => {
         try {
             const response = await authAPI.login({ email, password });
 
@@ -89,9 +89,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error("Login failed:", error);
             throw error;
         }
-    };
+    }, []);
 
-    const logout = async () => {
+    const logout = useCallback(async () => {
         try {
             await authAPI.logout();
         } catch (error) {
@@ -100,17 +100,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser(null);
             setAccessToken(null);
         }
-    };
+    }, []);
 
-    const value: AuthContextType = {
-        user,
-        accessToken,
-        login,
-        logout,
-        refreshTokens,
-        isLoading,
-        isAuthenticated: !!user && !!accessToken,
-    };
+    const value: AuthContextType = useMemo(
+        () => ({
+            user,
+            accessToken,
+            login,
+            logout,
+            refreshTokens,
+            isLoading,
+            isAuthenticated: !!user && !!accessToken,
+        }),
+        [user, accessToken, login, logout, refreshTokens, isLoading]
+    );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

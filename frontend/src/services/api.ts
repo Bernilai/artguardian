@@ -72,6 +72,10 @@ class ApiService {
             if (error instanceof ApiError) {
                 throw error;
             }
+            // Let callers cancel in-flight requests without treating as a hard failure.
+            if (error instanceof Error && error.name === 'AbortError') {
+                throw error;
+            }
             throw new ApiError(0, `Network error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
@@ -108,13 +112,23 @@ class ApiService {
         }
     }
 
-    async get<T>(endpoint: string, token?: string): Promise<T> {
+    async get<T>(
+        endpoint: string,
+        token?: string,
+        signal?: AbortSignal,
+        init?: Pick<RequestInit, 'cache'>
+    ): Promise<T> {
         const headers = new Headers();
         if (token) {
             headers.set('Authorization', `Bearer ${token}`);
         }
 
-        return this.request<T>(endpoint, { method: 'GET', headers });
+        return this.request<T>(endpoint, {
+            method: 'GET',
+            headers,
+            signal,
+            cache: init?.cache ?? 'default',
+        });
     }
 
     async post<T>(endpoint: string, data?: any, token?: string): Promise<T> {
@@ -177,7 +191,8 @@ class ApiService {
     async getWithParams<T>(
         endpoint: string,
         params: Record<string, any>,
-        token?: string
+        token?: string,
+        signal?: AbortSignal
     ): Promise<T> {
         const queryString = new URLSearchParams();
 
@@ -192,7 +207,7 @@ class ApiService {
         });
 
         const url = queryString.toString() ? `${endpoint}?${queryString}` : endpoint;
-        return this.get<T>(url, token);
+        return this.get<T>(url, token, signal);
     }
 
     async uploadFile<T>(

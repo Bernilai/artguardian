@@ -2,10 +2,12 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 import logging
 import os
+import shutil
 import subprocess
+import tarfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text, select, func
 
@@ -14,6 +16,7 @@ from app.dependencies import get_current_active_user
 from app.models import User, Artifact, Ticket, Detection, Notification
 from app.config import settings
 from app.utils.notifications import create_notification
+from app.schemas import PaginatedBackupsResponse, PaginationInfo, BackupListItem
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +147,7 @@ async def create_backup(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a database backup (only for admins)"""
+    """Create backups (PostgreSQL dump + MinIO bucket export) for admins"""
     if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -154,12 +157,6 @@ async def create_backup(
     database_url = str(engine.url)
     is_postgres = "postgresql" in database_url.lower()
     
-    if not is_postgres:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Backup is only available for PostgreSQL databases"
-        )
-    
     # Create backup directory if it doesn't exist
     backend_dir = Path(__file__).parent.parent.parent
     backups_dir = backend_dir / "backups"
@@ -167,150 +164,264 @@ async def create_backup(
     
     # Generate backup filename with timestamp
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    backup_filename = f"artguardian_backup_{timestamp}.sql"
-    backup_path = backups_dir / backup_filename
+    postgres_backup_filename = f"artguardian_backup_{timestamp}.sql"
+    postgres_backup_path = backups_dir / postgres_backup_filename
+
+    minio_backup_filename = f"artguardian_minio_backup_{timestamp}.tar.gz"
+    minio_backup_path = backups_dir / minio_backup_filename
+
+    # This is what we return to the frontend (it expects the BackupCreateResponse shape)
+    primary_backup_filename = postgres_backup_filename if is_postgres else minio_backup_filename
+    primary_backup_path = postgres_backup_path if is_postgres else minio_backup_path
+    primary_backup_size: Optional[int] = None
     
     try:
-        # Use environment variables (more reliable than parsing URL)
-        db_user = os.getenv("POSTGRES_USER", "artguardian")
-        db_password = os.getenv("POSTGRES_PASSWORD", "artguardian123")
-        db_host = os.getenv("POSTGRES_HOST", "localhost")
-        # Use direct PostgreSQL port, not PgBouncer port for backup
-        db_port = os.getenv("POSTGRES_PORT", "5432")
-        db_name = os.getenv("POSTGRES_DB", "artguardian")
-        
-        # Check if pg_dump is available
-        # On Windows, pg_dump might not be in PATH, so try Docker exec as fallback
-        pg_dump_available = False
-        use_docker = False
-        
-        try:
-            subprocess.run(["pg_dump", "--version"], capture_output=True, check=True, timeout=5)
-            pg_dump_available = True
-        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
-            # Try using Docker exec to run pg_dump inside the PostgreSQL container
+        # 1) PostgreSQL backup (optional if the current DB isn't PostgreSQL)
+        if is_postgres:
+            # Use environment variables (more reliable than parsing URL)
+            db_user = os.getenv("POSTGRES_USER", "artguardian")
+            db_password = os.getenv("POSTGRES_PASSWORD", "artguardian123")
+            db_host = os.getenv("POSTGRES_HOST", "localhost")
+            # Use direct PostgreSQL port, not PgBouncer port for backup
+            db_port = os.getenv("POSTGRES_PORT", "5432")
+            db_name = os.getenv("POSTGRES_DB", "artguardian")
+
+            # Check if pg_dump is available.
+            # On Windows, pg_dump might not be in PATH, so try Docker exec as fallback.
+            use_docker = False
             try:
-                result = subprocess.run(
-                    ["docker", "exec", "artguardian-postgres", "pg_dump", "--version"],
-                    capture_output=True,
-                    check=True,
-                    timeout=5
-                )
-                pg_dump_available = True
-                use_docker = True
-                logger.info("Using pg_dump via Docker container")
+                subprocess.run(["pg_dump", "--version"], capture_output=True, check=True, timeout=5)
             except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="pg_dump не найден. Установите PostgreSQL client tools или убедитесь, что Docker контейнер 'artguardian-postgres' запущен."
-                )
-        
-        # Create backup using pg_dump
-        if use_docker:
-            # Use Docker exec to run pg_dump inside the PostgreSQL container
-            container_backup_path = f"/tmp/{backup_filename}"
-            
-            backup_command = [
-                "docker", "exec",
-                "-e", f"PGPASSWORD={db_password}",
-                "artguardian-postgres",
-                "pg_dump",
-                "-h", "localhost",  # Inside container, use localhost
-                "-U", db_user,
-                "-d", db_name,
-                "-F", "c",  # Custom format (compressed)
-                "-f", container_backup_path
-            ]
-            
-            logger.info(f"Creating backup via Docker: {backup_filename}")
-            
-            result = subprocess.run(
-                backup_command,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 minute timeout
-            )
-            
-            if result.returncode == 0:
-                # Copy the backup file from container to host
-                copy_command = [
-                    "docker", "cp",
-                    f"artguardian-postgres:{container_backup_path}",
-                    str(backup_path)
-                ]
-                copy_result = subprocess.run(
-                    copy_command,
-                    capture_output=True,
-                    text=True,
-                    timeout=30
-                )
-                if copy_result.returncode != 0:
+                # Try using Docker exec to run pg_dump inside the PostgreSQL container
+                try:
+                    subprocess.run(
+                        ["docker", "exec", "artguardian-postgres", "pg_dump", "--version"],
+                        capture_output=True,
+                        check=True,
+                        timeout=5
+                    )
+                    use_docker = True
+                    logger.info("Using pg_dump via Docker container")
+                except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
                     raise HTTPException(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail=f"Failed to copy backup from container: {copy_result.stderr}"
+                        detail="pg_dump не найден. Установите PostgreSQL client tools или убедитесь, что Docker контейнер 'artguardian-postgres' запущен."
                     )
-                # Clean up file in container
-                subprocess.run(
-                    ["docker", "exec", "artguardian-postgres", "rm", container_backup_path],
-                    capture_output=True
+
+            # Create backup using pg_dump
+            if use_docker:
+                # Use Docker exec to run pg_dump inside the PostgreSQL container
+                container_backup_path = f"/tmp/{postgres_backup_filename}"
+
+                backup_command = [
+                    "docker", "exec",
+                    "-e", f"PGPASSWORD={db_password}",
+                    "artguardian-postgres",
+                    "pg_dump",
+                    "-h", "localhost",  # Inside container, use localhost
+                    "-U", db_user,
+                    "-d", db_name,
+                    "-F", "c",  # Custom format (compressed)
+                    "-f", container_backup_path
+                ]
+
+                result = subprocess.run(
+                    backup_command,
+                    capture_output=True,
+                    text=True,
+                    timeout=300  # 5 minute timeout
                 )
+
+                if result.returncode == 0:
+                    # Copy the backup file from container to host
+                    copy_command = [
+                        "docker", "cp",
+                        f"artguardian-postgres:{container_backup_path}",
+                        str(postgres_backup_path)
+                    ]
+                    copy_result = subprocess.run(
+                        copy_command,
+                        capture_output=True,
+                        text=True,
+                        timeout=30
+                    )
+                    if copy_result.returncode != 0:
+                        raise HTTPException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Failed to copy backup from container: {copy_result.stderr}"
+                        )
+                    # Clean up file in container
+                    subprocess.run(
+                        ["docker", "exec", "artguardian-postgres", "rm", container_backup_path],
+                        capture_output=True
+                    )
+                else:
+                    error_msg = result.stderr or result.stdout or "Unknown error"
+                    logger.error(f"Backup failed: {error_msg}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Backup failed: {error_msg[:200]}"
+                    )
             else:
-                error_msg = result.stderr or result.stdout or "Unknown error"
-                logger.error(f"Backup failed: {error_msg}")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Backup failed: {error_msg[:200]}"
+                # Use pg_dump directly (Linux/Mac or Windows with PostgreSQL installed)
+                env = os.environ.copy()
+                env["PGPASSWORD"] = db_password
+
+                backup_command = [
+                    "pg_dump",
+                    "-h", db_host,
+                    "-p", db_port,
+                    "-U", db_user,
+                    "-d", db_name,
+                    "-F", "c",  # Custom format (compressed)
+                    "-f", str(postgres_backup_path)
+                ]
+
+                logger.info(f"Creating backup: {postgres_backup_filename} from {db_host}:{db_port}/{db_name}")
+
+                result = subprocess.run(
+                    backup_command,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=300  # 5 minute timeout
                 )
-        else:
-            # Use pg_dump directly (Linux/Mac or Windows with PostgreSQL installed)
-            env = os.environ.copy()
-            env["PGPASSWORD"] = db_password
-            
-            backup_command = [
-                "pg_dump",
-                "-h", db_host,
-                "-p", db_port,
-                "-U", db_user,
-                "-d", db_name,
-                "-F", "c",  # Custom format (compressed)
-                "-f", str(backup_path)
-            ]
-            
-            logger.info(f"Creating backup: {backup_filename} from {db_host}:{db_port}/{db_name}")
-            
-            result = subprocess.run(
-                backup_command,
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 minute timeout
+
+                if result.returncode != 0:
+                    error_msg = result.stderr or result.stdout or "Unknown error"
+                    logger.error(f"Backup failed: {error_msg}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Backup failed: {error_msg[:200]}"  # Limit error message length
+                    )
+
+            # Record size + notify after we know the file exists
+            postgres_backup_size = postgres_backup_path.stat().st_size
+            primary_backup_size = postgres_backup_size
+
+            background_tasks.add_task(
+                notify_backup_completed,
+                db,
+                postgres_backup_filename,
+                postgres_backup_size
             )
-            
-            if result.returncode != 0:
-                error_msg = result.stderr or result.stdout or "Unknown error"
-                logger.error(f"Backup failed: {error_msg}")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Backup failed: {error_msg[:200]}"  # Limit error message length
-                )
-        
-        # Get backup file size
-        backup_size = backup_path.stat().st_size
-        
-        # Notify admins about backup completion
+
+        # 2) MinIO backup (always)
+        minio_access_key = settings.MINIO_ACCESS_KEY
+        minio_secret_key = settings.MINIO_SECRET_KEY
+        minio_bucket_name = settings.MINIO_BUCKET_NAME
+
+        # Export the bucket inside the MinIO container, docker cp the folder to the host, then tar.gz with Python.
+        # (Official MinIO image has `mc` but no `tar` — exit 127.)
+        minio_container_name = "minio"
+        minio_export_dir_container = f"/tmp/artguardian_minio_export_{timestamp}"
+        host_staging_dir = backups_dir / f"_minio_staging_{timestamp}"
+
+        # Ensure a clean export directory in container
+        subprocess.run(
+            ["docker", "exec", minio_container_name, "rm", "-rf", minio_export_dir_container],
+            capture_output=True,
+            text=True
+        )
+        subprocess.run(
+            ["docker", "exec", minio_container_name, "mkdir", "-p", minio_export_dir_container],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        # Configure `mc` inside the MinIO container
+        subprocess.run(
+            [
+                "docker", "exec", minio_container_name,
+                "mc", "alias", "set", "local",
+                "http://localhost:9000",
+                minio_access_key,
+                minio_secret_key
+            ],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        # Ensure bucket exists (backend lazily creates the bucket on first use)
+        subprocess.run(
+            ["docker", "exec", minio_container_name, "mc", "mb", "--ignore-existing", f"local/{minio_bucket_name}"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        # Copy bucket objects to local filesystem (preserves object paths as directories)
+        subprocess.run(
+            [
+                "docker", "exec", minio_container_name,
+                "mc", "cp", "--recursive",
+                f"local/{minio_bucket_name}/",
+                minio_export_dir_container
+            ],
+            capture_output=True,
+            text=True,
+            timeout=600,  # up to 10 minutes
+            check=True
+        )
+
+        if host_staging_dir.exists():
+            shutil.rmtree(host_staging_dir, ignore_errors=True)
+
+        copy_result = subprocess.run(
+            [
+                "docker", "cp",
+                f"{minio_container_name}:{minio_export_dir_container}",
+                str(host_staging_dir),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        if copy_result.returncode != 0:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to copy MinIO export from container: {copy_result.stderr or copy_result.stdout}"
+            )
+
+        try:
+            if minio_backup_path.exists():
+                minio_backup_path.unlink()
+            with tarfile.open(minio_backup_path, "w:gz") as tf:
+                for path in sorted(host_staging_dir.rglob("*")):
+                    if path.is_file():
+                        tf.add(
+                            path,
+                            arcname=path.relative_to(host_staging_dir).as_posix(),
+                        )
+        finally:
+            shutil.rmtree(host_staging_dir, ignore_errors=True)
+
+        # Cleanup in container (best-effort)
+        subprocess.run(
+            ["docker", "exec", minio_container_name, "rm", "-rf", minio_export_dir_container],
+            capture_output=True,
+            text=True
+        )
+
+        minio_backup_size = minio_backup_path.stat().st_size
+        if primary_backup_size is None:
+            primary_backup_size = minio_backup_size
+
         background_tasks.add_task(
             notify_backup_completed,
             db,
-            backup_filename,
-            backup_size
+            minio_backup_filename,
+            minio_backup_size
         )
         
         return {
             "success": True,
-            "filename": backup_filename,
-            "path": str(backup_path),
-            "size": backup_size,
-            "size_formatted": format_size(backup_size),
+            "filename": primary_backup_filename,
+            "path": str(primary_backup_path),
+            "size": primary_backup_size or 0,
+            "size_formatted": format_size(primary_backup_size or 0),
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         
@@ -327,34 +438,58 @@ async def create_backup(
         )
 
 
-@router.get("/backup/list", response_model=List[Dict[str, Any]])
+@router.get("/backup/list", response_model=PaginatedBackupsResponse)
 async def list_backups(
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(20, ge=1, le=100, alias="pageSize"),
 ):
-    """List available backups (only for admins)"""
+    """List available backups (only for admins, paginated)"""
     if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only administrators can list backups"
         )
-    
+
     backend_dir = Path(__file__).parent.parent.parent
     backups_dir = backend_dir / "backups"
-    
-    if not backups_dir.exists():
-        return []
-    
-    backups = []
-    for backup_file in sorted(backups_dir.glob("artguardian_backup_*.sql"), reverse=True):
+
+    backup_globs = [
+        "artguardian_backup_*.sql",
+        "artguardian_minio_backup_*.tar.gz",
+    ]
+    backup_files: List[Path] = []
+    if backups_dir.exists():
+        for backup_glob in backup_globs:
+            backup_files.extend(backups_dir.glob(backup_glob))
+
+    backup_files_sorted = sorted(backup_files, reverse=True)
+    total_items = len(backup_files_sorted)
+    total_pages = (total_items + pageSize - 1) // pageSize if total_items > 0 else 0
+    offset = (page - 1) * pageSize
+    page_files = backup_files_sorted[offset : offset + pageSize]
+
+    items: List[BackupListItem] = []
+    for backup_file in page_files:
         stat = backup_file.stat()
-        backups.append({
-            "filename": backup_file.name,
-            "size": stat.st_size,
-            "size_formatted": format_size(stat.st_size),
-            "created_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
-        })
-    
-    return backups
+        items.append(
+            BackupListItem(
+                filename=backup_file.name,
+                size=stat.st_size,
+                size_formatted=format_size(stat.st_size),
+                created_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+            )
+        )
+
+    return PaginatedBackupsResponse(
+        backups=items,
+        pagination=PaginationInfo(
+            currentPage=page,
+            totalPages=total_pages,
+            totalItems=total_items,
+            itemsPerPage=pageSize,
+        ),
+    )
 
 
 def format_size(size_bytes: int) -> str:

@@ -1,8 +1,39 @@
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {Artifact, Defect} from "../../../types";
 import {StatusBadge, LoadingSpinner} from "../../ui";
 import { useAuth } from "../../../contexts";
+import {
+    FALLBACK_ARTIFACT_IMAGE_SRC,
+    getArtifactImageUrl,
+    primaryArtifactImageUrl,
+} from '../artifactImageUrl';
 import './ArtifactDetail.css';
+
+const ArtifactDetailHeroImage: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
+    const primaryUrl = useMemo(
+        () => primaryArtifactImageUrl(artifact),
+        [artifact.id, artifact.images]
+    );
+    const [displaySrc, setDisplaySrc] = useState(() => primaryUrl ?? FALLBACK_ARTIFACT_IMAGE_SRC);
+
+    useEffect(() => {
+        setDisplaySrc(primaryUrl ?? FALLBACK_ARTIFACT_IMAGE_SRC);
+    }, [artifact.id, primaryUrl]);
+
+    const onError = useCallback(() => {
+        setDisplaySrc((prev) => (prev === FALLBACK_ARTIFACT_IMAGE_SRC ? prev : FALLBACK_ARTIFACT_IMAGE_SRC));
+    }, []);
+
+    return (
+        <img
+            src={displaySrc}
+            alt={artifact.title}
+            fetchPriority="high"
+            decoding="async"
+            onError={onError}
+        />
+    );
+};
 
 export interface ArtifactDetailProps {
     artifact: Artifact | null;
@@ -49,8 +80,6 @@ const ArtifactDetail: React.FC<ArtifactDetailProps> = ({
             </div>
         );
     }
-
-    const mainImage = artifact.images[0] || '/images/placeholder-artifact.jpg';
 
     return (
         <div className="artifact-detail">
@@ -101,23 +130,25 @@ const ArtifactDetail: React.FC<ArtifactDetailProps> = ({
                 {/* Основное изображение и галерея */}
                 <div className="artifact-detail__gallery">
                     <div className="artifact-detail__main-image">
-                        <img
-                            src={mainImage}
-                            alt={artifact.title}
-                            onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = '/images/placeholder-artifact.jpg';
-                            }}
-                        />
+                        <ArtifactDetailHeroImage artifact={artifact} />
                     </div>
 
                     {artifact.images.length > 1 && (
                         <div className="artifact-detail__thumbnails">
-                            {artifact.images.slice(1).map((image, index) => (
-                                <div key={index} className="artifact-detail__thumbnail">
-                                    <img src={image} alt={`${artifact.title} ${index + 2}`} />
-                                </div>
-                            ))}
+                            {artifact.images.slice(1).map((image, index) => {
+                                const thumbSrc = getArtifactImageUrl(image);
+                                if (!thumbSrc) return null;
+                                return (
+                                    <div key={index} className="artifact-detail__thumbnail">
+                                        <img
+                                            src={thumbSrc}
+                                            alt={`${artifact.title}, изображение ${index + 2}`}
+                                            loading="lazy"
+                                            decoding="async"
+                                        />
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>

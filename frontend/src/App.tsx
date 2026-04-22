@@ -22,6 +22,7 @@ function App() {
                             <Layout>
                                 <Routes>
                                     <Route path="/dashboard" element={<Dashboard />} />
+                                    <Route path="/collection/artifact/:artifactId" element={<Collection />} />
                                     <Route path="/collection" element={<Collection />} />
                                     <Route path="/tickets" element={<Tickets />} />
                                     <Route path="/analytics" element={<Analytics />} />

@@ -4,13 +4,11 @@ import './ListPaginationBar.css';
 
 export interface ListPaginationBarProps {
     pagination: PaginationInfo;
-    /** Current page index used for prev/next disabled state (usually matches API after load). */
     page: number;
     onPageChange: (page: number) => void;
     pageSize: number;
     onPageSizeChange: (pageSize: number) => void;
     pageSizeOptions: number[];
-    /** Append ` (всего: N)` after the page indicator. */
     showTotalCount?: boolean;
     className?: string;
 }

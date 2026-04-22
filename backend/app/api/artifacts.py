@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, func
 
 from app.database import get_db
 from app.models import Artifact
@@ -55,10 +55,9 @@ def transform_artifact_response(artifact: Artifact, current_user: Optional[User]
                 images = [presigned_url]
             except Exception as e:
                 logger.warning(f"Could not generate presigned URL for {artifact.image_path}: {e}")
-                try:
-                    images = [minio_service.get_public_url(artifact.image_path)]
-                except Exception:
-                    images = [artifact.image_path]
+                # Do not fall back to get_public_url(): for private buckets the browser gets XML/403 (not image/jpeg)
+                # and Chrome reports net::ERR_BLOCKED_BY_ORB on <img>. Presigned URLs are the supported case.
+                images = []
     
     show_inspection_info = current_user and current_user.role in ["restorer", "curator", "admin"]
     
@@ -95,20 +94,85 @@ def transform_artifact_response(artifact: Artifact, current_user: Optional[User]
 @router.get("/")
 async def get_all_artifacts(
     q: Optional[str] = Query(None, description="Search query for artifact name"),
+    status: Optional[str] = Query(
+        None,
+        description="Artifact status filter (frontend values: good/critical/requires_attention/under_restoration/exhibited)",
+    ),
+    collection: Optional[str] = Query(None, description="Collection filter"),
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(20, ge=1, alias="pageSize"),
+    sortBy: str = Query("created_at", alias="sortBy"),
+    sortDir: str = Query("desc", alias="sortDir"),
     current_user: Optional[User] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db)
-) -> List[dict]:
-    """Get all artifacts, optionally filtered by name"""
+) -> dict:
+    """Get artifacts with pagination, sorting and optional filters"""
     from sqlalchemy.orm import selectinload
-    
-    query = select(Artifact).options(selectinload(Artifact.last_inspector))
-    
+
+    # Map frontend status values to DB values
+    status_mapping = {
+        "good": "no_defects",
+        "critical": "has_defects",
+        "requires_attention": "requires_attention",
+        "under_restoration": "under_restoration",
+        "exhibited": "exhibited",
+        # allow passing DB values directly
+        "no_defects": "no_defects",
+        "has_defects": "has_defects",
+    }
+
+    conditions = []
     if q:
-        query = query.where(Artifact.title.ilike(f"%{q}%"))
-    
-    result = await db.execute(query)
+        conditions.append(Artifact.title.ilike(f"%{q}%"))
+    if status:
+        mapped_status = status_mapping.get(status, status)
+        conditions.append(Artifact.status == mapped_status)
+    if collection:
+        conditions.append(Artifact.collection.ilike(f"%{collection}%"))
+
+    filtered_query = select(Artifact).options(selectinload(Artifact.last_inspector))
+    if conditions:
+        filtered_query = filtered_query.where(*conditions)
+
+    count_query = select(func.count()).select_from(Artifact)
+    if conditions:
+        count_query = count_query.where(*conditions)
+
+    # Sorting (whitelist)
+    sort_dir = (sortDir or "desc").lower()
+    if sortBy == "title":
+        sort_column = Artifact.title
+    elif sortBy == "status":
+        sort_column = Artifact.status
+    else:
+        sort_column = Artifact.created_at
+
+    if sort_dir == "asc":
+        filtered_query = filtered_query.order_by(sort_column.asc(), Artifact.id.asc())
+    else:
+        filtered_query = filtered_query.order_by(sort_column.desc(), Artifact.id.asc())
+
+    # Pagination
+    offset = (page - 1) * pageSize
+    total_items = await db.execute(count_query)
+    total_items_value = total_items.scalar_one() or 0
+
+    # totalPages should be 0 when there are no items
+    total_pages = (total_items_value + pageSize - 1) // pageSize if total_items_value > 0 else 0
+
+    page_query = filtered_query.offset(offset).limit(pageSize)
+    result = await db.execute(page_query)
     artifacts = result.scalars().all()
-    return [transform_artifact_response(artifact, current_user) for artifact in artifacts]
+
+    return {
+        "artifacts": [transform_artifact_response(artifact, current_user) for artifact in artifacts],
+        "pagination": {
+            "currentPage": page,
+            "totalPages": total_pages,
+            "totalItems": total_items_value,
+            "itemsPerPage": pageSize,
+        },
+    }
 
 @router.get("/{artifact_id}")
 async def get_artifact(

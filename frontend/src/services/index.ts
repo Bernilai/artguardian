@@ -9,3 +9,4 @@ export { notificationsAPI } from './notificationsAPI';
 export { systemAPI } from './systemAPI';
 export { autoDetectionAPI } from './autoDetectionAPI';
 export { aiPreferencesAPI } from './aiPreferencesAPI';
+export { museumReferenceAPI } from './museumReferenceAPI';

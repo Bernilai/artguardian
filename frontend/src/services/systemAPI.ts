@@ -1,4 +1,5 @@
 import { apiService } from './api';
+import type { PaginationInfo } from '../types';
 
 export interface SystemInfo {
     database: {
@@ -51,6 +52,11 @@ export interface BackupCreateResponse {
     created_at: string;
 }
 
+export interface PaginatedBackupsResponse {
+    backups: Backup[];
+    pagination: PaginationInfo;
+}
+
 export const systemAPI = {
     /**
      * Get system information
@@ -74,10 +80,17 @@ export const systemAPI = {
     },
 
     /**
-     * List available backups
+     * List available backups (paginated)
      */
-    async listBackups(token?: string): Promise<Backup[]> {
-        return apiService.get<Backup[]>('/system/backup/list', token);
+    async listBackups(
+        token?: string,
+        params?: { page?: number; pageSize?: number }
+    ): Promise<PaginatedBackupsResponse> {
+        const q = new URLSearchParams();
+        if (params?.page != null) q.set('page', String(params.page));
+        if (params?.pageSize != null) q.set('pageSize', String(params.pageSize));
+        const suffix = q.toString() ? `?${q}` : '';
+        return apiService.get<PaginatedBackupsResponse>(`/system/backup/list${suffix}`, token);
     },
 };
 

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authAPI } from '../../services';
-import { Button } from "../../components";
+import { Button, Seo } from "../../components";
+import { getCanonicalOrigin } from '../../utils/siteUrl';
 import './Register.css';
 
 export const Register: React.FC = () => {
@@ -132,11 +133,25 @@ export const Register: React.FC = () => {
         }
     };
 
+    const siteUrl = getCanonicalOrigin();
+
     return (
         <div className="register-container">
+            <Seo
+                title="Регистрация"
+                description="Создайте аккаунт ArtGuardian для доступа к коллекции артефактов и реставрационным тикетам."
+                canonicalPath="/register"
+                jsonLd={{
+                    '@context': 'https://schema.org',
+                    '@type': 'WebPage',
+                    name: 'Регистрация — ArtGuardian',
+                    url: `${siteUrl}/register`,
+                    isPartOf: { '@type': 'WebSite', name: 'ArtGuardian', url: `${siteUrl}/` },
+                }}
+            />
             <div className="register-form">
-                <h1>ArtGuardian</h1>
-                <h2>Регистрация</h2>
+                <p className="register-brand" translate="no">ArtGuardian</p>
+                <h1>Регистрация</h1>
 
                 {errors.submit && <div className="register-error">{errors.submit}</div>}
 

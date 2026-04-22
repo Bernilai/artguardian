@@ -38,3 +38,7 @@ export {
 export {ProtectedRoute} from './ProtectedRoute';
 
 export { default as Toast, type ToastType } from './common/Toast';
+
+export { ListPaginationBar, type ListPaginationBarProps } from './common/ListPaginationBar';
+
+export { Seo, type SeoProps } from './Seo';

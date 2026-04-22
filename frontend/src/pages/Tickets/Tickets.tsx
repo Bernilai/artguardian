@@ -1,21 +1,83 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ticketsAPI, authAPI, artifactsAPI } from '../../services';
-import { Ticket, TicketStatus, TicketPriority, Artifact, User } from '../../types';
-import { LoadingSpinner, StatusBadge } from '../../components';
+import type { PaginatedUsersResponse } from '../../services/authAPI';
+import { Ticket, TicketStatus, TicketPriority, Artifact, User, PaginationInfo } from '../../types';
+import { LoadingSpinner, StatusBadge, ListPaginationBar, Seo } from '../../components';
+import SearchInputWithFocus from '../../components/SearchInputWithFocus';
+import { loadTicketsViewPrefs, saveTicketsViewPrefs } from '../../utils/listViewPreferences';
 import './Tickets.css';
 
 const Tickets: React.FC = () => {
+    const ticketsPrefsBoot = useMemo(() => loadTicketsViewPrefs(), []);
     const { accessToken } = useAuth();
     const [tickets, setTickets] = useState<Ticket[]>([]);
+    const [pagination, setPagination] = useState<PaginationInfo | null>(null);
     const [artifacts, setArtifacts] = useState<Artifact[]>([]);
     const [restorers, setRestorers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     
     // Filters
-    const [statusFilter, setStatusFilter] = useState<TicketStatus | 'all'>('all');
-    const [priorityFilter, setPriorityFilter] = useState<TicketPriority | 'all'>('all');
+    const [statusFilter, setStatusFilter] = useState<TicketStatus | 'all'>(ticketsPrefsBoot.statusFilter);
+    const [priorityFilter, setPriorityFilter] = useState<TicketPriority | 'all'>(ticketsPrefsBoot.priorityFilter);
+    const [assignedFilter, setAssignedFilter] = useState<string>(ticketsPrefsBoot.assignedFilter);
+    const [artifactQuery, setArtifactQuery] = useState<string>(ticketsPrefsBoot.artifactQuery);
+    const [debouncedArtifactQuery, setDebouncedArtifactQuery] = useState<string>(ticketsPrefsBoot.artifactQuery);
+
+    // Sorting
+    const [sortBy, setSortBy] = useState<'created_at' | 'priority'>(ticketsPrefsBoot.sortBy);
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>(ticketsPrefsBoot.sortDir);
+
+    // Pagination
+    const [page, setPage] = useState<number>(ticketsPrefsBoot.page);
+    const [pageSize, setPageSize] = useState<number>(ticketsPrefsBoot.pageSize);
+
+    // Used to force refresh after updates
+    const [refreshKey, setRefreshKey] = useState<number>(0);
+
+    const ticketsFilterSigRef = useRef<string | null>(null);
+    useEffect(() => {
+        const sig = JSON.stringify({
+            statusFilter,
+            priorityFilter,
+            assignedFilter,
+            debouncedArtifactQuery,
+            sortBy,
+            sortDir,
+        });
+        if (ticketsFilterSigRef.current === null) {
+            ticketsFilterSigRef.current = sig;
+            return;
+        }
+        if (ticketsFilterSigRef.current !== sig) {
+            ticketsFilterSigRef.current = sig;
+            setPage(1);
+        }
+    }, [statusFilter, priorityFilter, assignedFilter, debouncedArtifactQuery, sortBy, sortDir]);
+
+    useEffect(() => {
+        saveTicketsViewPrefs({
+            statusFilter,
+            priorityFilter,
+            assignedFilter,
+            artifactQuery,
+            sortBy,
+            sortDir,
+            page,
+            pageSize,
+        });
+    }, [statusFilter, priorityFilter, assignedFilter, artifactQuery, sortBy, sortDir, page, pageSize]);
+
+    const goToPage = (nextPage: number) => {
+        setPage(Math.max(1, nextPage));
+    };
+
+    const handlePageSizeChange = (nextPageSize: number) => {
+        const safeSize = Math.max(1, nextPageSize);
+        setPageSize(safeSize);
+        setPage(1);
+    };
     
     // UI state
     const [showCreateForm, setShowCreateForm] = useState(false);
@@ -32,49 +94,95 @@ const Tickets: React.FC = () => {
     });
 
     useEffect(() => {
-        loadData();
-    }, [accessToken, statusFilter]);
-
-    const loadData = async () => {
         if (!accessToken) return;
-        
-        try {
-            setLoading(true);
-            setError(null);
-            
-            // Load tickets with filters
-            const filters: any = {};
-            if (statusFilter !== 'all') {
-                filters.status = statusFilter;
-            }
-            
-            const [ticketsData, artifactsList, restorersData] = await Promise.all([
-                ticketsAPI.fetchTickets(filters, accessToken),
-                artifactsAPI.fetchArtifacts(accessToken),
-                authAPI.getUsers('restorer', false, accessToken).catch(() => []) // Fallback to empty array if error
-            ]);
-            
-            setTickets(ticketsData);
-            setArtifacts(artifactsList);
-            setRestorers(restorersData);
-            
-            // If no restorers found, try to get all active users as fallback
-            if (restorersData.length === 0) {
-                try {
-                    const allUsers = await authAPI.getUsers(undefined, false, accessToken);
-                    setRestorers(allUsers);
-                } catch (err) {
-                    console.warn('Could not load users for assignment:', err);
+
+        const loadDropdownData = async () => {
+            try {
+                const [artifactsResp, restorersResp] = await Promise.all([
+                    artifactsAPI.fetchArtifacts({ page: 1, pageSize: 1000, sortBy: 'title', sortDir: 'asc' }, accessToken),
+                    authAPI.getUsers('restorer', false, accessToken, { page: 1, pageSize: 500 }).catch((): PaginatedUsersResponse => ({
+                        users: [],
+                        pagination: { currentPage: 1, totalPages: 0, totalItems: 0, itemsPerPage: 500 },
+                    })),
+                ]);
+
+                setArtifacts(artifactsResp.artifacts);
+                let restorerList = restorersResp.users;
+
+                // If no restorers found, try to get all active users as fallback
+                if (restorerList.length === 0) {
+                    try {
+                        const allUsersResp = await authAPI.getUsers(undefined, false, accessToken, {
+                            page: 1,
+                            pageSize: 500,
+                        });
+                        restorerList = allUsersResp.users;
+                    } catch (err) {
+                        console.warn('Could not load users for assignment:', err);
+                    }
                 }
+                setRestorers(restorerList);
+            } catch (err) {
+                console.error('Failed to load dropdown data:', err);
             }
-            
-        } catch (err) {
-            console.error('Failed to load tickets:', err);
-            setError('Не удалось загрузить тикеты');
-        } finally {
-            setLoading(false);
-        }
-    };
+        };
+
+        loadDropdownData();
+    }, [accessToken]);
+
+    // Debounce artifact-name search so we don't refetch on every keystroke.
+    useEffect(() => {
+        const t = window.setTimeout(() => {
+            setDebouncedArtifactQuery(artifactQuery);
+        }, 300);
+
+        return () => window.clearTimeout(t);
+    }, [artifactQuery]);
+
+    useEffect(() => {
+        if (!accessToken) return;
+
+        const loadTickets = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+
+                const params: any = {
+                    page,
+                    pageSize,
+                    sortBy,
+                    sortDir,
+                };
+
+                if (statusFilter !== 'all') params.status = statusFilter;
+                if (priorityFilter !== 'all') params.priority = priorityFilter;
+                if (assignedFilter) params.assigned_to = assignedFilter;
+                if (debouncedArtifactQuery) params.artifact_q = debouncedArtifactQuery;
+
+                const resp = await ticketsAPI.fetchTickets(params, accessToken);
+                setTickets(resp.tickets);
+                setPagination(resp.pagination);
+            } catch (err) {
+                console.error('Failed to load tickets:', err);
+                setError('Не удалось загрузить тикеты');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadTickets();
+    }, [
+        accessToken,
+        statusFilter,
+        priorityFilter,
+        assignedFilter,
+        debouncedArtifactQuery,
+        page,
+        pageSize,
+        sortBy,
+        sortDir,
+        refreshKey
+    ]);
 
     const handleCreateTicket = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -82,7 +190,7 @@ const Tickets: React.FC = () => {
         
         try {
             setError(null);
-            const newTicket = await ticketsAPI.createTicket({
+            await ticketsAPI.createTicket({
                 artifact_id: formData.artifact_id,
                 title: formData.title,
                 description: formData.description || undefined,
@@ -90,9 +198,10 @@ const Tickets: React.FC = () => {
                 assigned_to_id: formData.assigned_to_id || undefined,
                 notes: formData.notes || undefined
             }, accessToken);
-            
-            setTickets([newTicket, ...tickets]);
+
             setShowCreateForm(false);
+            setPage(1);
+            setRefreshKey((k) => k + 1);
             setFormData({
                 artifact_id: '',
                 title: '',
@@ -121,6 +230,7 @@ const Tickets: React.FC = () => {
             if (selectedTicket?.id === ticketId) {
                 setSelectedTicket(updatedTicket);
             }
+            setRefreshKey((k) => k + 1);
         } catch (err) {
             console.error('Failed to update ticket:', err);
             setError('Не удалось обновить статус тикета');
@@ -141,6 +251,7 @@ const Tickets: React.FC = () => {
             if (selectedTicket?.id === ticketId) {
                 setSelectedTicket(updatedTicket);
             }
+            setRefreshKey((k) => k + 1);
         } catch (err) {
             console.error('Failed to assign restorer:', err);
             setError('Не удалось назначить реставратора');
@@ -170,16 +281,13 @@ const Tickets: React.FC = () => {
         return `priority-${priority}`;
     };
 
-    if (loading) {
-        return (
-            <div className="tickets-page">
-                <LoadingSpinner text="Загрузка тикетов..." />
-            </div>
-        );
-    }
-
     return (
         <div className="tickets-page">
+            <Seo
+                title="Тикеты реставрации"
+                description="Реставрационные тикеты ArtGuardian: статусы, приоритеты и назначения."
+                canonicalPath="/tickets"
+            />
             <div className="page-header">
                 <h1>Реставрационные тикеты</h1>
                 <button 
@@ -196,13 +304,15 @@ const Tickets: React.FC = () => {
                 </div>
             )}
 
-            {/* Filters */}
             <div className="tickets-filters">
                 <div className="filter-group">
                     <label>Статус:</label>
                     <select 
                         value={statusFilter} 
-                        onChange={(e) => setStatusFilter(e.target.value as TicketStatus | 'all')}
+                        onChange={(e) => {
+                            setStatusFilter(e.target.value as TicketStatus | 'all');
+                            setPage(1);
+                        }}
                     >
                         <option value="all">Все</option>
                         <option value="open">Открыт</option>
@@ -214,7 +324,10 @@ const Tickets: React.FC = () => {
                     <label>Приоритет:</label>
                     <select 
                         value={priorityFilter} 
-                        onChange={(e) => setPriorityFilter(e.target.value as TicketPriority | 'all')}
+                        onChange={(e) => {
+                            setPriorityFilter(e.target.value as TicketPriority | 'all');
+                            setPage(1);
+                        }}
                     >
                         <option value="all">Все</option>
                         <option value="low">Низкий</option>
@@ -223,9 +336,68 @@ const Tickets: React.FC = () => {
                         <option value="urgent">Срочный</option>
                     </select>
                 </div>
+
+                <div className="filter-group">
+                    <label>Назначен реставратору:</label>
+                    <select
+                        value={assignedFilter}
+                        onChange={(e) => {
+                            setAssignedFilter(e.target.value);
+                            setPage(1);
+                        }}
+                    >
+                        <option value="">Любой</option>
+                        {restorers.map((user) => (
+                            <option key={user.id} value={user.id}>
+                                {user.name} {user.role !== 'restorer' ? `(${user.role})` : ''}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="filter-group">
+                    <label>Артефакт (название):</label>
+                    <SearchInputWithFocus
+                        value={artifactQuery}
+                        onChange={(next) => {
+                            setArtifactQuery(next);
+                            setPage(1);
+                        }}
+                        loading={loading}
+                        storageFocusedKey="tickets_artifact_search_focused"
+                        placeholder="Поиск по названию артефакта..."
+                    />
+                </div>
+
+                <div className="filter-group">
+                    <label>Сортировка:</label>
+                    <select
+                        value={sortBy}
+                        onChange={(e) => {
+                            setSortBy(e.target.value as 'created_at' | 'priority');
+                            setPage(1);
+                        }}
+                    >
+                        <option value="created_at">Дата создания</option>
+                        <option value="priority">Приоритет</option>
+                    </select>
+                </div>
+
+                <div className="filter-group">
+                    <label>Направление:</label>
+                    <select
+                        value={sortDir}
+                        onChange={(e) => {
+                            setSortDir(e.target.value as 'asc' | 'desc');
+                            setPage(1);
+                        }}
+                    >
+                        <option value="desc">По убыванию</option>
+                        <option value="asc">По возрастанию</option>
+                    </select>
+                </div>
             </div>
 
-            {/* Create Ticket Form */}
             {showCreateForm && (
                 <div className="modal-overlay" onClick={() => setShowCreateForm(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -333,9 +505,10 @@ const Tickets: React.FC = () => {
                 </div>
             )}
 
-            {/* Tickets List */}
             <div className="tickets-content">
-                {tickets.length === 0 ? (
+                {loading ? (
+                    <LoadingSpinner text="Загрузка тикетов..." />
+                ) : tickets.length === 0 ? (
                     <div className="tickets-empty">
                         <div className="empty-icon">📋</div>
                         <h3>Нет тикетов</h3>
@@ -343,11 +516,9 @@ const Tickets: React.FC = () => {
                     </div>
                 ) : (
                     <div className="tickets-list">
-                        {tickets
-                            .filter(ticket => priorityFilter === 'all' || ticket.priority === priorityFilter)
-                            .map(ticket => (
-                            <div 
-                                key={ticket.id} 
+                        {tickets.map(ticket => (
+                            <div
+                                key={ticket.id}
                                 className={`ticket-card ${getPriorityClass(ticket.priority)}`}
                                 onClick={() => setSelectedTicket(ticket)}
                             >
@@ -363,7 +534,7 @@ const Tickets: React.FC = () => {
                                         </span>
                                     </div>
                                 </div>
-                                
+
                                 <div className="ticket-card__body">
                                     {ticket.artifact_title && (
                                         <div className="ticket-artifact">
@@ -374,7 +545,7 @@ const Tickets: React.FC = () => {
                                         <p className="ticket-description">{ticket.description}</p>
                                     )}
                                 </div>
-                                
+
                                 <div className="ticket-card__footer">
                                     <div className="ticket-assignment">
                                         {ticket.assigned_to_name ? (
@@ -393,7 +564,18 @@ const Tickets: React.FC = () => {
                 )}
             </div>
 
-            {/* Ticket Detail Modal */}
+            {pagination && (
+                <ListPaginationBar
+                    pagination={pagination}
+                    page={page}
+                    onPageChange={goToPage}
+                    pageSize={pageSize}
+                    onPageSizeChange={handlePageSizeChange}
+                    pageSizeOptions={[12, 20, 50]}
+                    showTotalCount
+                />
+            )}
+
             {selectedTicket && (
                 <div className="modal-overlay" onClick={() => setSelectedTicket(null)}>
                     <div className="modal-content ticket-detail" onClick={(e) => e.stopPropagation()}>

@@ -4,12 +4,12 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models import Ticket, Artifact, User
-from app.schemas import TicketCreate, TicketUpdate, TicketResponse
+from app.schemas import TicketCreate, TicketUpdate, TicketResponse, PaginatedTicketsResponse
 from app.dependencies import get_current_active_user, require_restorer_curator_or_admin
 from app.models import User as UserModel
 from app.utils.notifications import (
@@ -22,31 +22,87 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/", response_model=List[TicketResponse])
+@router.get("/", response_model=PaginatedTicketsResponse)
 async def get_all_tickets(
     status_filter: Optional[str] = Query(None, alias="status"),
+    # Frontend sends `priority` query param (not `priority_filter`)
+    priority_filter: Optional[str] = Query(None, alias="priority"),
     assigned_to: Optional[str] = Query(None),
     artifact_id: Optional[str] = Query(None),
+    artifact_q: Optional[str] = Query(None, description="Search by artifact title"),
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(20, ge=1, alias="pageSize"),
+    sortBy: str = Query("created_at", alias="sortBy"),
+    sortDir: str = Query("desc", alias="sortDir"),
     current_user: User = Depends(require_restorer_curator_or_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get all tickets with optional filters (restorer/curator/admin only)"""
+    """Get tickets with optional filters, sorting and pagination (restorer/curator/admin only)"""
+
+    conditions = []
+    if status_filter:
+        conditions.append(Ticket.status == status_filter)
+    if priority_filter:
+        conditions.append(Ticket.priority == priority_filter)
+    if assigned_to:
+        conditions.append(Ticket.assigned_to_id == assigned_to)
+    if artifact_id:
+        conditions.append(Ticket.artifact_id == artifact_id)
+    if artifact_q:
+        conditions.append(Artifact.title.ilike(f"%{artifact_q}%"))
+
     query = select(Ticket).options(
         selectinload(Ticket.artifact),
         selectinload(Ticket.assigned_to),
         selectinload(Ticket.created_by)
     )
-    
-    if status_filter:
-        query = query.where(Ticket.status == status_filter)
-    if assigned_to:
-        query = query.where(Ticket.assigned_to_id == assigned_to)
-    if artifact_id:
-        query = query.where(Ticket.artifact_id == artifact_id)
-    
-    query = query.order_by(Ticket.created_at.desc())
-    
-    result = await db.execute(query)
+
+    # When searching by artifact title, join Artifact so filtering works.
+    if artifact_q:
+        query = query.join(Artifact, Ticket.artifact_id == Artifact.id)
+
+    if conditions:
+        query = query.where(*conditions)
+
+    sort_dir = (sortDir or "desc").lower()
+    if sortBy == "priority":
+        # Higher priority first on `desc`: urgent > high > medium > low
+        # Map priorities to a sortable scale where "urgent" is the largest value.
+        priority_order = case(
+            (Ticket.priority == "urgent", 4),
+            (Ticket.priority == "high", 3),
+            (Ticket.priority == "medium", 2),
+            (Ticket.priority == "low", 1),
+            else_=0,
+        )
+        if sort_dir == "asc":
+            query = query.order_by(priority_order.asc(), Ticket.created_at.desc(), Ticket.id.asc())
+        else:
+            query = query.order_by(priority_order.desc(), Ticket.created_at.desc(), Ticket.id.asc())
+    else:
+        # Default sorting: created_at
+        sort_column = Ticket.created_at
+        if sort_dir == "asc":
+            query = query.order_by(sort_column.asc(), Ticket.id.asc())
+        else:
+            query = query.order_by(sort_column.desc(), Ticket.id.asc())
+
+    offset = (page - 1) * pageSize
+
+    # Count query (needs DISTINCT because of join when artifact_q is used)
+    count_query = select(func.count(func.distinct(Ticket.id))).select_from(Ticket)
+    if artifact_q:
+        count_query = count_query.join(Artifact, Ticket.artifact_id == Artifact.id)
+    if conditions:
+        count_query = count_query.where(*conditions)
+
+    total_items_result = await db.execute(count_query)
+    total_items_value = total_items_result.scalar_one() or 0
+
+    total_pages = (total_items_value + pageSize - 1) // pageSize if total_items_value > 0 else 0
+
+    page_query = query.offset(offset).limit(pageSize)
+    result = await db.execute(page_query)
     tickets = result.scalars().all()
     
     # Convert to response format with related data
@@ -71,7 +127,15 @@ async def get_all_tickets(
         }
         ticket_responses.append(TicketResponse(**ticket_dict))
     
-    return ticket_responses
+    return {
+        "tickets": ticket_responses,
+        "pagination": {
+            "currentPage": page,
+            "totalPages": total_pages,
+            "totalItems": total_items_value,
+            "itemsPerPage": pageSize,
+        },
+    }
 
 
 @router.get("/{ticket_id}", response_model=TicketResponse)
