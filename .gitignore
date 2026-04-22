@@ -50,9 +50,8 @@ backups/
 *.bak
 
 # Test files
-test_*.py
-debug_*.py
-*_test.py
+test_output.txt
+.pytest_cache/
 
 # Temporary files
 *.tmp
