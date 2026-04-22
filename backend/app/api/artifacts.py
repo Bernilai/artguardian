@@ -386,7 +386,7 @@ async def delete_artifact(
             except Exception as e:
                 logger.warning(f"Could not delete image from MinIO: {e}")
         
-        db.delete(artifact)
+        await db.delete(artifact)
         await db.commit()
         
         logger.info(f"Deleted artifact: {artifact_id}")
