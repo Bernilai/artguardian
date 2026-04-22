@@ -64,72 +64,6 @@ async def get_unread_count(
     return {"count": count}
 
 
-@router.put("/{notification_id}", response_model=NotificationResponse)
-async def update_notification(
-    notification_id: str,
-    notification_data: NotificationUpdate,
-    current_user: UserModel = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Update notification (mark as read/unread)"""
-    result = await db.execute(
-        select(Notification).where(
-            and_(
-                Notification.id == notification_id,
-                Notification.user_id == current_user.id
-            )
-        )
-    )
-    notification = result.scalar_one_or_none()
-    
-    if not notification:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Notification not found"
-        )
-    
-    if notification_data.is_read is not None:
-        notification.is_read = notification_data.is_read
-        if notification_data.is_read:
-            notification.read_at = datetime.now(timezone.utc)
-        else:
-            notification.read_at = None
-    
-    await db.commit()
-    await db.refresh(notification)
-    
-    return notification
-
-
-@router.delete("/{notification_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_notification(
-    notification_id: str,
-    current_user: UserModel = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Delete a notification"""
-    result = await db.execute(
-        select(Notification).where(
-            and_(
-                Notification.id == notification_id,
-                Notification.user_id == current_user.id
-            )
-        )
-    )
-    notification = result.scalar_one_or_none()
-    
-    if not notification:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Notification not found"
-        )
-    
-    await db.delete(notification)
-    await db.commit()
-    
-    return None
-
-
 @router.post("/mark-all-read", status_code=status.HTTP_200_OK)
 async def mark_all_read(
     current_user: UserModel = Depends(get_current_active_user),
@@ -145,14 +79,14 @@ async def mark_all_read(
         )
     )
     notifications = result.scalars().all()
-    
+
     now = datetime.now(timezone.utc)
     for notification in notifications:
         notification.is_read = True
         notification.read_at = now
-    
+
     await db.commit()
-    
+
     return {"marked": len(notifications)}
 
 
@@ -214,6 +148,72 @@ async def update_notification_preferences(
     
     await db.commit()
     await db.refresh(preferences)
-    
+
     return preferences
+
+
+@router.put("/{notification_id}", response_model=NotificationResponse)
+async def update_notification(
+    notification_id: str,
+    notification_data: NotificationUpdate,
+    current_user: UserModel = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update notification (mark as read/unread)"""
+    result = await db.execute(
+        select(Notification).where(
+            and_(
+                Notification.id == notification_id,
+                Notification.user_id == current_user.id,
+            )
+        )
+    )
+    notification = result.scalar_one_or_none()
+
+    if not notification:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification not found",
+        )
+
+    if notification_data.is_read is not None:
+        notification.is_read = notification_data.is_read
+        if notification_data.is_read:
+            notification.read_at = datetime.now(timezone.utc)
+        else:
+            notification.read_at = None
+
+    await db.commit()
+    await db.refresh(notification)
+
+    return notification
+
+
+@router.delete("/{notification_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_notification(
+    notification_id: str,
+    current_user: UserModel = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a notification"""
+    result = await db.execute(
+        select(Notification).where(
+            and_(
+                Notification.id == notification_id,
+                Notification.user_id == current_user.id,
+            )
+        )
+    )
+    notification = result.scalar_one_or_none()
+
+    if not notification:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification not found",
+        )
+
+    await db.delete(notification)
+    await db.commit()
+
+    return None
 
