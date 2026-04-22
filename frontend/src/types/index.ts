@@ -15,6 +15,7 @@ export type {
     CollectionStats,
     ImageAnalysisResult,
 } from './artifacts';
+export type { PaginationInfo } from './artifacts';
 
 export type {
     User,
@@ -28,7 +29,8 @@ export type {
     TicketStatus,
     TicketPriority,
     CreateTicketRequest,
-    UpdateTicketRequest
+    UpdateTicketRequest,
+    TicketsResponse
 } from './tickets';
 
 export type {
