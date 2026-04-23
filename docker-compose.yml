@@ -54,7 +54,7 @@ services:
       PGBOUNCER_SERVER_LIFETIME: 7200  # 2 hours (increased from default 3600s)
       PGBOUNCER_SERVER_IDLE_TIMEOUT: 1800  # 30 minutes (increased from default 600s)
       # Authentication - use auth_query to verify passwords against PostgreSQL
-      PGBOUNCER_AUTH_TYPE: scram-sha-256
+      PGBOUNCER_AUTH_TYPE: plain
       PGBOUNCER_AUTH_USER: ${POSTGRES_USER}
       PGBOUNCER_AUTH_QUERY: SELECT usename, passwd FROM pg_shadow WHERE usename=$1
       # Fallback to userlist.txt
