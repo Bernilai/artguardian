@@ -19,7 +19,8 @@
     "web-vitals": "^2.1.4"
   },
   "devDependencies": {
-    "eslint": "^8.57.1"
+    "eslint": "^8.57.1",
+    "yaml": "^2.4.2"
   },
   "scripts": {
     "start": "react-scripts start",
