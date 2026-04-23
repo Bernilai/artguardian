@@ -49,12 +49,18 @@ export default function SearchInputWithFocus({
         if (!focusFlagKey) return;
         if (loading) return;
 
-        if (shouldMaintainFocusRef.current) {
+        if (!shouldMaintainFocusRef.current) return;
+
+        // Defer restore so it runs after focus moves to a clicked control (e.g. “stop loading” in tests)
+        // and after React 18 Strict Mode’s effect cleanup in development.
+        const id = window.setTimeout(() => {
+            if (!shouldMaintainFocusRef.current) return;
+            shouldMaintainFocusRef.current = false;
             if (document.activeElement !== inputRef.current) {
                 focusToEnd();
             }
-            shouldMaintainFocusRef.current = false;
-        }
+        }, 0);
+        return () => window.clearTimeout(id);
     }, [loading, focusFlagKey, focusToEnd]);
 
     return (
@@ -64,7 +70,9 @@ export default function SearchInputWithFocus({
             placeholder={placeholder}
             value={value}
             onChange={(e) => {
-                shouldMaintainFocusRef.current = document.activeElement === inputRef.current;
+                // Any user edit should allow refocus after loading. Relying on activeElement === input
+                // is flaky in JSDOM during userEvent.type; parent-driven value updates do not fire onChange.
+                shouldMaintainFocusRef.current = true;
                 onChange(e.target.value);
             }}
             onFocus={() => {
