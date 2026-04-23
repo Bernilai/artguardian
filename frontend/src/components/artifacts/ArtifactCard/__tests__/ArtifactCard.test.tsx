@@ -1,6 +1,5 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import type { Artifact, Defect } from '../../../../types';
 import ArtifactCard from '../ArtifactCard';
 
@@ -143,24 +142,23 @@ describe('ArtifactCard', () => {
     describe('viewMode CSS class', () => {
         it('defaults to artifact-card--grid', () => {
             const artifact = makeArtifact();
-            const { container } = render(<ArtifactCard artifact={artifact} />);
+            render(<ArtifactCard artifact={artifact} />);
 
-            const card = container.querySelector('.artifact-card');
-            expect(card).toHaveClass('artifact-card--grid');
+            expect(screen.getByTestId('artifact-card-root')).toHaveClass('artifact-card--grid');
         });
 
         it('uses artifact-card--list for list mode', () => {
             const artifact = makeArtifact();
-            const { container } = render(<ArtifactCard artifact={artifact} viewMode="list" />);
+            render(<ArtifactCard artifact={artifact} viewMode="list" />);
 
-            expect(container.querySelector('.artifact-card')).toHaveClass('artifact-card--list');
+            expect(screen.getByTestId('artifact-card-root')).toHaveClass('artifact-card--list');
         });
 
         it('uses artifact-card--compact for compact mode', () => {
             const artifact = makeArtifact();
-            const { container } = render(<ArtifactCard artifact={artifact} viewMode="compact" />);
+            render(<ArtifactCard artifact={artifact} viewMode="compact" />);
 
-            expect(container.querySelector('.artifact-card')).toHaveClass('artifact-card--compact');
+            expect(screen.getByTestId('artifact-card-root')).toHaveClass('artifact-card--compact');
         });
     });
 
@@ -168,9 +166,9 @@ describe('ArtifactCard', () => {
         it('calls onClick with artifact when card is clicked', () => {
             const artifact = makeArtifact();
             const onClick = jest.fn();
-            const { container } = render(<ArtifactCard artifact={artifact} onClick={onClick} />);
+            render(<ArtifactCard artifact={artifact} onClick={onClick} />);
 
-            fireEvent.click(container.querySelector('.artifact-card') as HTMLElement);
+            fireEvent.click(screen.getByTestId('artifact-card-root'));
             expect(onClick).toHaveBeenCalledTimes(1);
             expect(onClick).toHaveBeenCalledWith(artifact);
         });
@@ -178,12 +176,11 @@ describe('ArtifactCard', () => {
         it('calls onClick on Enter when card is focused', () => {
             const artifact = makeArtifact();
             const onClick = jest.fn();
-            const { container } = render(<ArtifactCard artifact={artifact} onClick={onClick} />);
+            render(<ArtifactCard artifact={artifact} onClick={onClick} />);
 
-            const card = container.querySelector('.artifact-card') as HTMLElement;
+            const card = screen.getByTestId('artifact-card-root');
             card.focus();
-            // user-event v13: keyboard без setup(); Enter на сфокусированной карточке.
-            userEvent.keyboard('{Enter}');
+            fireEvent.keyDown(card, { key: 'Enter', code: 'Enter' });
 
             expect(onClick).toHaveBeenCalledTimes(1);
             expect(onClick).toHaveBeenCalledWith(artifact);
@@ -192,11 +189,11 @@ describe('ArtifactCard', () => {
         it('calls onClick on Space when card is focused', () => {
             const artifact = makeArtifact();
             const onClick = jest.fn();
-            const { container } = render(<ArtifactCard artifact={artifact} onClick={onClick} />);
+            render(<ArtifactCard artifact={artifact} onClick={onClick} />);
 
-            const card = container.querySelector('.artifact-card') as HTMLElement;
+            const card = screen.getByTestId('artifact-card-root');
             card.focus();
-            userEvent.keyboard(' ');
+            fireEvent.keyDown(card, { key: ' ', code: 'Space' });
 
             expect(onClick).toHaveBeenCalledTimes(1);
             expect(onClick).toHaveBeenCalledWith(artifact);
@@ -204,11 +201,9 @@ describe('ArtifactCard', () => {
 
         it('does not throw when onClick is omitted and card is clicked', () => {
             const artifact = makeArtifact();
-            const { container } = render(<ArtifactCard artifact={artifact} />);
+            render(<ArtifactCard artifact={artifact} />);
 
-            expect(() =>
-                fireEvent.click(container.querySelector('.artifact-card') as HTMLElement),
-            ).not.toThrow();
+            expect(() => fireEvent.click(screen.getByTestId('artifact-card-root'))).not.toThrow();
         });
     });
 
@@ -246,9 +241,9 @@ describe('ArtifactCard', () => {
     describe('defects', () => {
         it('does not render defect section when defects is empty', () => {
             const artifact = makeArtifact({ defects: [] });
-            const { container } = render(<ArtifactCard artifact={artifact} />);
+            render(<ArtifactCard artifact={artifact} />);
 
-            expect(container.querySelector('.artifact-card__defects')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('artifact-card-defects')).not.toBeInTheDocument();
         });
 
         it('renders both tags for two defects without +N', () => {
@@ -258,12 +253,12 @@ describe('ArtifactCard', () => {
                     makeDefect({ id: 'd2', type: 'peeling', location: 'b' }),
                 ],
             });
-            const { container } = render(<ArtifactCard artifact={artifact} />);
+            render(<ArtifactCard artifact={artifact} />);
 
-            expect(container.querySelector('.artifact-card__defects')).toBeInTheDocument();
+            expect(screen.getByTestId('artifact-card-defects')).toBeInTheDocument();
             expect(screen.getByText(/stain/)).toBeInTheDocument();
             expect(screen.getByText(/peeling/)).toBeInTheDocument();
-            expect(container.querySelector('.defect-tag--more')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('artifact-defect-more')).not.toBeInTheDocument();
         });
 
         it('shows first three defects and +1 for four', () => {
@@ -275,7 +270,7 @@ describe('ArtifactCard', () => {
                     makeDefect({ id: 'd4', type: 'other', location: 'd' }),
                 ],
             });
-            const { container } = render(<ArtifactCard artifact={artifact} />);
+            render(<ArtifactCard artifact={artifact} />);
 
             expect(screen.getByText(/stain/)).toBeInTheDocument();
             expect(screen.getByText(/peeling/)).toBeInTheDocument();

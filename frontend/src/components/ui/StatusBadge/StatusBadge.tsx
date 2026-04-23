@@ -90,7 +90,10 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({
         // Fallback if config is still undefined
         console.warn(`Unknown status: ${status}, using default`);
         return (
-            <span className={`status-badge status-badge--${size} ${className}`}>
+            <span
+                className={`status-badge status-badge--${size} ${className}`}
+                data-testid="status-badge-root"
+            >
                 <span className="status-badge__label">{status}</span>
             </span>
         );
@@ -99,6 +102,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({
     return (
         <span
             className={`status-badge ${config.className} status-badge--${size} ${className}`}
+            data-testid="status-badge-root"
             title={config.label}
         >
       {showIcon && <span className="status-badge__icon">{config.icon}</span>}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 
 type Props = {
     value: string;
@@ -23,7 +23,7 @@ export default function SearchInputWithFocus({
 
     const focusFlagKey = useMemo(() => storageFocusedKey || '', [storageFocusedKey]);
 
-    const focusToEnd = () => {
+    const focusToEnd = useCallback(() => {
         const el = inputRef.current;
         if (!el) return;
 
@@ -33,7 +33,7 @@ export default function SearchInputWithFocus({
             el.setSelectionRange(end, end);
         } catch {
         }
-    };
+    }, [value]);
 
     useEffect(() => {
         if (!focusFlagKey) return;
@@ -43,7 +43,7 @@ export default function SearchInputWithFocus({
 
         focusToEnd();
         window.localStorage.removeItem(focusFlagKey);
-    }, [focusFlagKey]);
+    }, [focusFlagKey, focusToEnd]);
 
     useEffect(() => {
         if (!focusFlagKey) return;
@@ -55,7 +55,7 @@ export default function SearchInputWithFocus({
             }
             shouldMaintainFocusRef.current = false;
         }
-    }, [loading, focusFlagKey]);
+    }, [loading, focusFlagKey, focusToEnd]);
 
     return (
         <input

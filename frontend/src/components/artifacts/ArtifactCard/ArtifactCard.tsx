@@ -37,7 +37,7 @@ const ArtifactCard: React.FC<ArtifactCardProps> = ({
         onInspect?.(artifact);
     };
 
-    const primaryUrl = useMemo(() => primaryArtifactImageUrl(artifact), [artifact.id, artifact.images]);
+    const primaryUrl = useMemo(() => primaryArtifactImageUrl(artifact), [artifact]);
     const [displaySrc, setDisplaySrc] = useState(() => primaryUrl ?? FALLBACK_ARTIFACT_IMAGE_SRC);
 
     useEffect(() => {
@@ -51,9 +51,11 @@ const ArtifactCard: React.FC<ArtifactCardProps> = ({
     return (
         <div
             className={`artifact-card artifact-card--${viewMode}`}
+            data-testid="artifact-card-root"
             onClick={handleClick}
             role="button"
             tabIndex={0}
+            aria-label={artifact.title}
             onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     handleClick();
@@ -118,7 +120,7 @@ const ArtifactCard: React.FC<ArtifactCardProps> = ({
                 </div>
 
                 {artifact.defects.length > 0 && (
-                    <div className="artifact-card__defects">
+                    <div className="artifact-card__defects" data-testid="artifact-card-defects">
                         {artifact.defects.slice(0, 3).map(defect => (
                             <span
                                 key={defect.id}
@@ -129,7 +131,7 @@ const ArtifactCard: React.FC<ArtifactCardProps> = ({
               </span>
                         ))}
                         {artifact.defects.length > 3 && (
-                            <span className="defect-tag defect-tag--more">
+                            <span className="defect-tag defect-tag--more" data-testid="artifact-defect-more">
                 +{artifact.defects.length - 3}
               </span>
                         )}

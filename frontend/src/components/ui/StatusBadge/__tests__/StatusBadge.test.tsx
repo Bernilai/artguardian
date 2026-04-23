@@ -51,42 +51,42 @@ describe('StatusBadge', () => {
     });
 
     it('uses medium size class by default', () => {
-        const { container } = render(<StatusBadge status="good" />);
+        render(<StatusBadge status="good" />);
 
-        expect(container.firstChild).toHaveClass('status-badge--medium');
+        expect(screen.getByTestId('status-badge-root')).toHaveClass('status-badge--medium');
     });
 
     it('uses small size class when size is small', () => {
-        const { container } = render(<StatusBadge status="good" size="small" />);
+        render(<StatusBadge status="good" size="small" />);
 
-        expect(container.firstChild).toHaveClass('status-badge--small');
+        expect(screen.getByTestId('status-badge-root')).toHaveClass('status-badge--small');
     });
 
     it('uses large size class when size is large', () => {
-        const { container } = render(<StatusBadge status="good" size="large" />);
+        render(<StatusBadge status="good" size="large" />);
 
-        expect(container.firstChild).toHaveClass('status-badge--large');
+        expect(screen.getByTestId('status-badge-root')).toHaveClass('status-badge--large');
     });
 
     it('applies custom className to root element', () => {
-        const { container } = render(<StatusBadge status="good" className="extra" />);
+        render(<StatusBadge status="good" className="extra" />);
 
-        expect(container.firstChild).toHaveClass('extra');
+        expect(screen.getByTestId('status-badge-root')).toHaveClass('extra');
     });
 
     it('sets title attribute to russian label', () => {
-        const { container } = render(<StatusBadge status="good" />);
+        render(<StatusBadge status="good" />);
 
-        expect(container.firstChild).toHaveAttribute('title', 'Хорошее');
+        expect(screen.getByTestId('status-badge-root')).toHaveAttribute('title', 'Хорошее');
     });
 
     it('renders raw status for unknown value without crash', () => {
         const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-        const { container } = render(<StatusBadge status={'unknown_xyz' as any} />);
+        render(<StatusBadge status={'unknown_xyz' as any} />);
 
         expect(screen.getByText('unknown_xyz')).toBeInTheDocument();
-        expect(container.firstChild).not.toHaveAttribute('title');
+        expect(screen.getByTestId('status-badge-root')).not.toHaveAttribute('title');
         expect(warnSpy).toHaveBeenCalledWith('Unknown status: unknown_xyz, using default');
     });
 });

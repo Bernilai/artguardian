@@ -22,7 +22,7 @@ const ArtifactList: React.FC<ArtifactListProps> = ({
                                                    }) => {
     if (artifacts.length === 0) {
         return (
-            <div className="artifact-list__empty">
+            <div className="artifact-list__empty" data-testid="artifact-list-empty">
                 <div className="artifact-list__empty-icon">🖼️</div>
                 <h3>{emptyMessage}</h3>
                 <p>Попробуйте изменить параметры поиска или фильтры</p>
@@ -31,7 +31,7 @@ const ArtifactList: React.FC<ArtifactListProps> = ({
     }
 
     return (
-        <div className={`artifact-list artifact-list--${viewMode}`}>
+        <div className={`artifact-list artifact-list--${viewMode}`} data-testid="artifact-list-root">
             {artifacts.map(artifact => (
                 <ArtifactCard
                     key={artifact.id}

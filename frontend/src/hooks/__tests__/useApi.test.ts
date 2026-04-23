@@ -1,5 +1,10 @@
 // До react-router-dom (на случай транзитивных импортов): TextEncoder в jsdom.
 import "../../components/ProtectedRoute/__tests__/routerJestSetup";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import type { Artifact, ArtifactsResponse, PaginationInfo } from "../../types";
+import { useAuth } from "../../contexts";
+import { artifactsAPI } from "../../services";
+import { useApi } from "../useApi";
 
 jest.mock("../../contexts", () => ({
   useAuth: jest.fn(),
@@ -11,12 +16,6 @@ jest.mock("../../services", () => ({
     fetchArtifactById: jest.fn(),
   },
 }));
-
-import { act, renderHook, waitFor } from "@testing-library/react";
-import type { Artifact, ArtifactsResponse, PaginationInfo } from "../../types";
-import { useAuth } from "../../contexts";
-import { artifactsAPI } from "../../services";
-import { useApi } from "../useApi";
 
 const mockedUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockedFetchArtifacts = artifactsAPI.fetchArtifacts as jest.MockedFunction<

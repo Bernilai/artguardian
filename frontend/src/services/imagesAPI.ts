@@ -1,5 +1,4 @@
 import { API_BASE_URL } from './config';
-import { apiService } from './api';
 
 export interface ImageUploadResponse {
     object_path: string;

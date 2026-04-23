@@ -158,7 +158,7 @@ describe("SearchInputWithFocus", () => {
 
       const input = screen.getByRole("textbox");
       await waitFor(() => {
-        expect(document.activeElement).toBe(input);
+        expect(input).toHaveFocus();
       });
 
       expect(removeItemSpy).toHaveBeenCalledWith(STORAGE_KEY);
@@ -176,7 +176,7 @@ describe("SearchInputWithFocus", () => {
       );
 
       const input = screen.getByRole("textbox");
-      expect(document.activeElement).not.toBe(input);
+      expect(input).not.toHaveFocus();
     });
   });
 
@@ -190,13 +190,13 @@ describe("SearchInputWithFocus", () => {
 
       // Имитация потери фокуса до/во время загрузки (как при перерисовке родителя).
       input.blur();
-      expect(document.activeElement).not.toBe(input);
+      expect(input).not.toHaveFocus();
 
       await userEvent.click(screen.getByTestId("start-loading"));
       await userEvent.click(screen.getByTestId("end-loading"));
 
       await waitFor(() => {
-        expect(document.activeElement).toBe(input);
+        expect(input).toHaveFocus();
       });
     });
 
@@ -208,12 +208,12 @@ describe("SearchInputWithFocus", () => {
 
       await userEvent.click(input);
       await userEvent.click(other);
-      expect(document.activeElement).toBe(other);
+      expect(other).toHaveFocus();
 
       await userEvent.click(screen.getByTestId("start-loading"));
       await userEvent.click(screen.getByTestId("end-loading"));
 
-      expect(document.activeElement).not.toBe(input);
+      expect(input).not.toHaveFocus();
     });
 
     it("без storageFocusedKey — логика восстановления после loading не выполняется", async () => {
@@ -228,7 +228,7 @@ describe("SearchInputWithFocus", () => {
       await userEvent.click(screen.getByTestId("end-loading"));
 
       // При отсутствии ключа эффект сразу выходит: фокус не возвращают.
-      expect(document.activeElement).not.toBe(input);
+      expect(input).not.toHaveFocus();
     });
   });
 });

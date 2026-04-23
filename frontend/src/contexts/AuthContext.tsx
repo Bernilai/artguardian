@@ -57,14 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setRefreshCallback(refreshTokens);
     }, [refreshTokens]);
 
-    useEffect(() => {
-        if (initializedRef.current) return;
-        initializedRef.current = true;
-
-        initializeAuth();
-    }, []);
-
-    const initializeAuth = async () => {
+    const initializeAuth = useCallback(async () => {
         try {
             const token = await refreshTokens();
 
@@ -77,7 +70,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [refreshTokens]);
+
+    useEffect(() => {
+        if (initializedRef.current) return;
+        initializedRef.current = true;
+
+        void initializeAuth();
+    }, [initializeAuth]);
 
     const login = useCallback(async (email: string, password: string) => {
         try {

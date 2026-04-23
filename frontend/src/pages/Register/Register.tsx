@@ -51,7 +51,7 @@ export const Register: React.FC = () => {
         // Validate password using native HTML5 validation
         const passwordInput = document.getElementById('password') as HTMLInputElement;
         if (passwordInput) {
-            const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:'",.<>?/\\|`~]{8,32}$/;
+            const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_+\-=\x5b\x5d{};:'",.<>?/\\|`~]{8,32}$/;
             if (!formData.password) {
                 passwordInput.setCustomValidity("Введите пароль");
             } else if (formData.password.length < 8 || formData.password.length > 32) {

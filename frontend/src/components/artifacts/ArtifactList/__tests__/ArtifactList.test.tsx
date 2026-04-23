@@ -53,9 +53,9 @@ describe('ArtifactList', () => {
 
     describe('empty state', () => {
         it('renders empty state with default message when artifacts is empty', () => {
-            const { container } = render(<ArtifactList artifacts={[]} />);
+            render(<ArtifactList artifacts={[]} />);
 
-            expect(container.querySelector('.artifact-list__empty')).toBeInTheDocument();
+            expect(screen.getByTestId('artifact-list-empty')).toBeInTheDocument();
             expect(
                 screen.getByRole('heading', { level: 3, name: 'Артефакты не найдены' }),
             ).toBeInTheDocument();
@@ -133,26 +133,25 @@ describe('ArtifactList', () => {
 
     describe('viewMode CSS class on list container', () => {
         it('defaults to artifact-list--grid', () => {
-            const { container } = render(<ArtifactList artifacts={[makeArtifact({ id: 'x' })]} />);
+            render(<ArtifactList artifacts={[makeArtifact({ id: 'x' })]} />);
 
-            const list = container.querySelector('.artifact-list');
-            expect(list).toHaveClass('artifact-list--grid');
+            expect(screen.getByTestId('artifact-list-root')).toHaveClass('artifact-list--grid');
         });
 
         it('uses artifact-list--list when viewMode is list', () => {
-            const { container } = render(
+            render(
                 <ArtifactList artifacts={[makeArtifact({ id: 'x' })]} viewMode="list" />,
             );
 
-            expect(container.querySelector('.artifact-list')).toHaveClass('artifact-list--list');
+            expect(screen.getByTestId('artifact-list-root')).toHaveClass('artifact-list--list');
         });
 
         it('uses artifact-list--compact when viewMode is compact', () => {
-            const { container } = render(
+            render(
                 <ArtifactList artifacts={[makeArtifact({ id: 'x' })]} viewMode="compact" />,
             );
 
-            expect(container.querySelector('.artifact-list')).toHaveClass('artifact-list--compact');
+            expect(screen.getByTestId('artifact-list-root')).toHaveClass('artifact-list--compact');
         });
     });
 

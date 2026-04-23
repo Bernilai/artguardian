@@ -74,9 +74,9 @@ describe('ListPaginationBar', () => {
         });
 
         it('adds custom className to root element', () => {
-            const { container } = renderComponent({ className: 'my-class' });
+            renderComponent({ className: 'my-class' });
 
-            expect(container.firstChild).toHaveClass('my-class');
+            expect(screen.getByTestId('list-pagination-bar')).toHaveClass('my-class');
         });
 
         it('renders all page size options in select', () => {

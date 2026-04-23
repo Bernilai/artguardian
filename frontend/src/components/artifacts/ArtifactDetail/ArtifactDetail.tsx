@@ -12,7 +12,7 @@ import './ArtifactDetail.css';
 const ArtifactDetailHeroImage: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
     const primaryUrl = useMemo(
         () => primaryArtifactImageUrl(artifact),
-        [artifact.id, artifact.images]
+        [artifact]
     );
     const [displaySrc, setDisplaySrc] = useState(() => primaryUrl ?? FALLBACK_ARTIFACT_IMAGE_SRC);
 
@@ -134,7 +134,7 @@ const ArtifactDetail: React.FC<ArtifactDetailProps> = ({
                     </div>
 
                     {artifact.images.length > 1 && (
-                        <div className="artifact-detail__thumbnails">
+                        <div className="artifact-detail__thumbnails" data-testid="artifact-detail-thumbnails">
                             {artifact.images.slice(1).map((image, index) => {
                                 const thumbSrc = getArtifactImageUrl(image);
                                 if (!thumbSrc) return null;
@@ -176,7 +176,7 @@ const ArtifactDetail: React.FC<ArtifactDetailProps> = ({
                             </div>
                             {showInspectionInfo && (
                                 <>
-                                    <div className="info-item">
+                                    <div className="info-item" data-testid="artifact-detail-last-inspection">
                                         <label>Последняя проверка:</label>
                                         <span>
                                             {artifact.lastInspection && artifact.lastInspection !== '' 
@@ -202,7 +202,7 @@ const ArtifactDetail: React.FC<ArtifactDetailProps> = ({
                     <section className="artifact-detail__section">
                         <h2>Физические характеристики</h2>
                         <div className="info-grid">
-                            <div className="info-item">
+                            <div className="info-item" data-testid="artifact-detail-dimensions">
                                 <label>Размеры:</label>
                                 <span>
                   {artifact.dimensions.width} × {artifact.dimensions.height}
@@ -243,8 +243,17 @@ const ArtifactDetail: React.FC<ArtifactDetailProps> = ({
                                 {artifact.defects.map(defect => (
                                     <div
                                         key={defect.id}
+                                        role="button"
+                                        tabIndex={0}
+                                        data-testid={`artifact-defect-row-${defect.id}`}
                                         className={`defect-item defect-item--${defect.severity}`}
                                         onClick={() => onDefectClick?.(defect)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                onDefectClick?.(defect);
+                                            }
+                                        }}
                                     >
                                         <div className="defect-item__header">
                                             <span className="defect-item__type">{getDefectLabel(defect.type)}</span>

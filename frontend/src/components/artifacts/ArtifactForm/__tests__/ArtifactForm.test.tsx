@@ -40,7 +40,7 @@ const fillRequiredFields = async () => {
   await userEvent.type(screen.getByLabelText("Коллекция *"), "Main collection");
 };
 
-const getImageInput = () => document.getElementById("image") as HTMLInputElement;
+const getImageInput = () => screen.getByTestId("artifact-image-file-input") as HTMLInputElement;
 
 const createImageFile = (options?: { type?: string; size?: number }) => {
   const type = options?.type ?? "image/jpeg";
@@ -147,21 +147,19 @@ describe("ArtifactForm", () => {
     });
 
     it("calls onClose when clicking overlay", () => {
-      const { container } = renderForm();
-      const overlay = container.querySelector(".artifact-form-overlay");
+      renderForm();
+      const overlay = screen.getByTestId("artifact-form-overlay");
 
-      expect(overlay).toBeTruthy();
-      fireEvent.click(overlay as Element);
+      fireEvent.click(overlay);
 
       expect(onCloseMock).toHaveBeenCalledTimes(1);
     });
 
     it("does not call onClose when clicking inside container", () => {
-      const { container } = renderForm();
-      const formContainer = container.querySelector(".artifact-form-container");
+      renderForm();
+      const formContainer = screen.getByTestId("artifact-form-container");
 
-      expect(formContainer).toBeTruthy();
-      fireEvent.click(formContainer as Element);
+      fireEvent.click(formContainer);
 
       expect(onCloseMock).not.toHaveBeenCalled();
     });

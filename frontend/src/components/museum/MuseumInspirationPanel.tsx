@@ -44,7 +44,7 @@ export const MuseumInspirationPanel: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [accessToken, page, deckNonce]);
+    }, [accessToken, page]);
 
     useEffect(() => {
         if (!accessToken) {
@@ -52,7 +52,7 @@ export const MuseumInspirationPanel: React.FC = () => {
             return;
         }
         void load();
-    }, [accessToken, load]);
+    }, [accessToken, load, deckNonce]);
 
     if (!accessToken) {
         return null;

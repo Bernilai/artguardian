@@ -37,18 +37,9 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({
 
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
-    const [existingImagePath, setExistingImagePath] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // Load existing image if editing
-    React.useEffect(() => {
-        if (mode === 'edit' && initialData) {
-            // Try to get image from initialData if available
-            // Note: initialData might not have images array, so we'll handle it in the form
-        }
-    }, [mode, initialData]);
 
     const materialTypes: MaterialType[] = [
         'oil_paint', 'watercolor', 'acrylic', 'tempera', 'canvas',
@@ -183,8 +174,8 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({
     };
 
     return (
-        <div className="artifact-form-overlay" onClick={onClose}>
-            <div className="artifact-form-container" onClick={(e) => e.stopPropagation()}>
+        <div className="artifact-form-overlay" data-testid="artifact-form-overlay" onClick={onClose}>
+            <div className="artifact-form-container" data-testid="artifact-form-container" onClick={(e) => e.stopPropagation()}>
                 <div className="artifact-form-header">
                     <h2>{mode === 'create' ? 'Добавить артефакт' : 'Редактировать артефакт'}</h2>
                     <button className="artifact-form-close" onClick={onClose}>×</button>
@@ -285,6 +276,7 @@ const ArtifactForm: React.FC<ArtifactFormProps> = ({
                                         ref={fileInputRef}
                                         type="file"
                                         id="image"
+                                        data-testid="artifact-image-file-input"
                                         accept="image/*"
                                         onChange={handleImageChange}
                                         disabled={isLoading}

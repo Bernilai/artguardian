@@ -21,23 +21,23 @@ describe('Toast', () => {
     });
 
     it('renders success type class and icon', () => {
-        const { container } = render(<Toast message="Успех" type="success" onClose={onCloseMock} />);
+        render(<Toast message="Успех" type="success" onClose={onCloseMock} />);
 
-        expect(container.firstChild).toHaveClass('toast--success');
+        expect(screen.getByTestId('toast-root')).toHaveClass('toast--success');
         expect(screen.getByText('✓')).toBeInTheDocument();
     });
 
     it('renders error type class and icon', () => {
-        const { container } = render(<Toast message="Ошибка" type="error" onClose={onCloseMock} />);
+        render(<Toast message="Ошибка" type="error" onClose={onCloseMock} />);
 
-        expect(container.firstChild).toHaveClass('toast--error');
+        expect(screen.getByTestId('toast-root')).toHaveClass('toast--error');
         expect(screen.getByText('✕')).toBeInTheDocument();
     });
 
     it('renders info type class and icon', () => {
-        const { container } = render(<Toast message="Инфо" type="info" onClose={onCloseMock} />);
+        render(<Toast message="Инфо" type="info" onClose={onCloseMock} />);
 
-        expect(container.firstChild).toHaveClass('toast--info');
+        expect(screen.getByTestId('toast-root')).toHaveClass('toast--info');
         expect(screen.getByText('ℹ')).toBeInTheDocument();
     });
 

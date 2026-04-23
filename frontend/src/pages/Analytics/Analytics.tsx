@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { analyticsAPI } from '../../services';
 import { LoadingSpinner, Seo } from '../../components';
@@ -17,11 +17,7 @@ const Analytics: React.FC = () => {
     const [data, setData] = useState<AnalyticsData | null>(null);
     const [trendDays, setTrendDays] = useState(30);
 
-    useEffect(() => {
-        loadAnalytics();
-    }, [accessToken, trendDays]);
-
-    const loadAnalytics = async () => {
+    const loadAnalytics = useCallback(async () => {
         if (!accessToken) return;
         
         try {
@@ -41,7 +37,11 @@ const Analytics: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [accessToken, trendDays]);
+
+    useEffect(() => {
+        void loadAnalytics();
+    }, [loadAnalytics]);
 
     const getStatusLabel = (status: string): string => {
         const labels: Record<string, string> = {

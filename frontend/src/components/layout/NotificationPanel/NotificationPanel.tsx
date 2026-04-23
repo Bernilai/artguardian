@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { notificationsAPI } from '../../../services';
 import { Notification } from '../../../types';
@@ -17,11 +17,27 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, onClose }
     const [error, setError] = useState<string | null>(null);
     const panelRef = useRef<HTMLDivElement>(null);
 
+    const loadNotifications = useCallback(async () => {
+        if (!accessToken) return;
+
+        try {
+            setLoading(true);
+            setError(null);
+            const data = await notificationsAPI.getNotifications(false, 20, 0, accessToken);
+            setNotifications(data);
+        } catch (err: any) {
+            console.error('Error loading notifications:', err);
+            setError('Не удалось загрузить уведомления');
+        } finally {
+            setLoading(false);
+        }
+    }, [accessToken]);
+
     useEffect(() => {
         if (isOpen && accessToken) {
-            loadNotifications();
+            void loadNotifications();
         }
-    }, [isOpen, accessToken]);
+    }, [isOpen, accessToken, loadNotifications]);
 
     // Close panel when clicking outside
     useEffect(() => {
@@ -38,22 +54,6 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, onClose }
             };
         }
     }, [isOpen, onClose]);
-
-    const loadNotifications = async () => {
-        if (!accessToken) return;
-
-        try {
-            setLoading(true);
-            setError(null);
-            const data = await notificationsAPI.getNotifications(false, 20, 0, accessToken);
-            setNotifications(data);
-        } catch (err: any) {
-            console.error('Error loading notifications:', err);
-            setError('Не удалось загрузить уведомления');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const handleMarkAsRead = async (notificationId: string) => {
         if (!accessToken) return;

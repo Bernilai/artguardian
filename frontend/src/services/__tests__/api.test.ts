@@ -1,4 +1,4 @@
-import { ApiError, ApiService } from '../api';
+import { ApiService } from '../api';
 
 const BASE_URL = 'http://test.example/api';
 

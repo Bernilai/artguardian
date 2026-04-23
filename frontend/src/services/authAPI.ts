@@ -7,10 +7,7 @@ export interface PaginatedUsersResponse {
     pagination: PaginationInfo;
 }
 
-let refreshCallback: (() => Promise<string>) | null = null;
-
 export const setRefreshCallback = (callback: () => Promise<string>) => {
-    refreshCallback = callback;
     apiService.setRefreshCallback(callback);
 };
 

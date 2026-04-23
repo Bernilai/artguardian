@@ -138,8 +138,8 @@ describe('ArtifactDetail', () => {
 
             // Размеры: «10 × 20» и суффикс единицы (в разметке число и unit — соседние узлы)
             expect(screen.getByText('Размеры:')).toBeInTheDocument();
-            const dimensionsItem = screen.getByText('Размеры:').closest('.info-item');
-            expect(dimensionsItem?.textContent?.replace(/\s+/g, ' ').trim()).toMatch(
+            const dimensionsItem = screen.getByTestId('artifact-detail-dimensions');
+            expect(dimensionsItem.textContent?.replace(/\s+/g, ' ').trim()).toMatch(
                 /Размеры:\s*10\s*×\s*20\s*cm/
             );
 
@@ -210,7 +210,7 @@ describe('ArtifactDetail', () => {
                 />
             );
 
-            const inspectionRow = screen.getByText('Последняя проверка:').closest('.info-item');
+            const inspectionRow = screen.getByTestId('artifact-detail-last-inspection');
             expect(inspectionRow).toHaveTextContent('Не указана');
         });
 
@@ -359,7 +359,7 @@ describe('ArtifactDetail', () => {
             );
             expect(screen.getAllByRole('img')).toHaveLength(1);
             expect(screen.getByRole('img')).toHaveAttribute('src', '/images/a.jpg');
-            expect(document.querySelector('.artifact-detail__thumbnails')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('artifact-detail-thumbnails')).not.toBeInTheDocument();
         });
 
         it('три изображения — две миниатюры после главного', () => {
@@ -375,7 +375,7 @@ describe('ArtifactDetail', () => {
             expect(imgs[0]).toHaveAttribute('src', '/images/a.jpg');
             expect(imgs[1]).toHaveAttribute('src', '/images/b.jpg');
             expect(imgs[2]).toHaveAttribute('src', '/images/c.jpg');
-            expect(document.querySelector('.artifact-detail__thumbnails')).toBeInTheDocument();
+            expect(screen.getByTestId('artifact-detail-thumbnails')).toBeInTheDocument();
         });
     });
 
@@ -417,9 +417,8 @@ describe('ArtifactDetail', () => {
                 />
             );
 
-            const row = screen.getByText('Трещина').closest('.defect-item');
-            expect(row).toBeTruthy();
-            fireEvent.click(row as HTMLElement);
+            const row = screen.getByTestId('artifact-defect-row-defect-1');
+            fireEvent.click(row);
             expect(onDefectClick).toHaveBeenCalledWith(defect);
         });
 

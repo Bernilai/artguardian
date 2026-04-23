@@ -20,7 +20,7 @@ const Toast: React.FC<ToastProps> = ({ message, type, onClose, duration = 5000 }
     }, [duration, onClose]);
 
     return (
-        <div className={`toast toast--${type}`}>
+        <div className={`toast toast--${type}`} data-testid="toast-root">
             <div className="toast__content">
                 <span className="toast__icon">
                     {type === 'success' && '✓'}

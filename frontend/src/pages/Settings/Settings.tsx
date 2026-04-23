@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { authAPI, notificationsAPI, systemAPI, autoDetectionAPI, aiPreferencesAPI } from '../../services';
 import { User, NotificationPreferences, PaginationInfo } from '../../types';
@@ -9,7 +9,6 @@ import './Settings.css';
 const Settings: React.FC = () => {
     const { accessToken, user: currentUser } = useAuth();
     const [activeTab, setActiveTab] = useState('general');
-    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     
@@ -20,7 +19,6 @@ const Settings: React.FC = () => {
     const [usersPageSize, setUsersPageSize] = useState(10);
     const [usersLoading, setUsersLoading] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
-    const [showUserForm, setShowUserForm] = useState(false);
     const [includeInactive, setIncludeInactive] = useState(false);
     const [changingPasswordFor, setChangingPasswordFor] = useState<string | null>(null);
     const [newPassword, setNewPassword] = useState('');
@@ -68,29 +66,7 @@ const Settings: React.FC = () => {
         { id: 'system', label: 'Система', icon: '💻' },
     ];
 
-    useEffect(() => {
-        if (activeTab === 'notifications' && accessToken) {
-            loadNotificationPreferences();
-        } else if (activeTab === 'ai' && accessToken) {
-            loadAIPreferences();
-        }
-    }, [activeTab, accessToken]);
-
-    useEffect(() => {
-        setUsersPage(1);
-    }, [includeInactive]);
-
-    useEffect(() => {
-        if (activeTab !== 'users' || !accessToken) return;
-        loadUsers();
-    }, [activeTab, accessToken, includeInactive, usersPage, usersPageSize]);
-
-    useEffect(() => {
-        if (activeTab !== 'system' || !accessToken || currentUser?.role !== 'admin') return;
-        loadSystemData();
-    }, [activeTab, accessToken, currentUser?.role, backupPage, backupPageSize]);
-
-    const loadNotificationPreferences = async () => {
+    const loadNotificationPreferences = useCallback(async () => {
         if (!accessToken) return;
         
         try {
@@ -104,7 +80,92 @@ const Settings: React.FC = () => {
         } finally {
             setNotificationsLoading(false);
         }
-    };
+    }, [accessToken]);
+
+    const loadUsers = useCallback(async () => {
+        if (!accessToken) return;
+        
+        try {
+            setUsersLoading(true);
+            setError(null);
+            const resp = await authAPI.getUsers(undefined, includeInactive, accessToken, {
+                page: usersPage,
+                pageSize: usersPageSize,
+            });
+            setUsers(resp.users);
+            setUsersPagination(resp.pagination);
+        } catch (err) {
+            console.error('Failed to load users:', err);
+            setError('Не удалось загрузить пользователей');
+        } finally {
+            setUsersLoading(false);
+        }
+    }, [accessToken, includeInactive, usersPage, usersPageSize]);
+
+    const loadSystemData = useCallback(async () => {
+        if (!accessToken) return;
+        
+        try {
+            setSystemLoading(true);
+            setError(null);
+            const [info, stats, backupsResp] = await Promise.all([
+                systemAPI.getSystemInfo(accessToken),
+                systemAPI.getPerformanceStats(accessToken),
+                systemAPI.listBackups(accessToken, { page: backupPage, pageSize: backupPageSize }),
+            ]);
+            setSystemInfo(info);
+            setPerformanceStats(stats);
+            setBackups(backupsResp.backups);
+            setBackupsPagination(backupsResp.pagination);
+        } catch (err: any) {
+            console.error('Error loading system data:', err);
+            setError('Не удалось загрузить системную информацию');
+        } finally {
+            setSystemLoading(false);
+        }
+    }, [accessToken, backupPage, backupPageSize]);
+
+    const loadAIPreferences = useCallback(async () => {
+        if (!accessToken) return;
+        
+        try {
+            setAiLoading(true);
+            setError(null);
+            const [preferences, status] = await Promise.all([
+                aiPreferencesAPI.getPreferences(accessToken),
+                autoDetectionAPI.getStatus(accessToken).catch(() => ({ available: false, message: 'Сервис недоступен' }))
+            ]);
+            setAiPreferences(preferences);
+            setAiStatus(status);
+        } catch (err: any) {
+            console.error('Error loading AI preferences:', err);
+            setError('Не удалось загрузить настройки AI');
+        } finally {
+            setAiLoading(false);
+        }
+    }, [accessToken]);
+
+    useEffect(() => {
+        if (activeTab === 'notifications' && accessToken) {
+            void loadNotificationPreferences();
+        } else if (activeTab === 'ai' && accessToken) {
+            void loadAIPreferences();
+        }
+    }, [activeTab, accessToken, loadNotificationPreferences, loadAIPreferences]);
+
+    useEffect(() => {
+        setUsersPage(1);
+    }, [includeInactive]);
+
+    useEffect(() => {
+        if (activeTab !== 'users' || !accessToken) return;
+        void loadUsers();
+    }, [activeTab, accessToken, includeInactive, usersPage, usersPageSize, loadUsers]);
+
+    useEffect(() => {
+        if (activeTab !== 'system' || !accessToken || currentUser?.role !== 'admin') return;
+        void loadSystemData();
+    }, [activeTab, accessToken, currentUser?.role, backupPage, backupPageSize, loadSystemData]);
 
     const saveNotificationPreferences = async () => {
         if (!accessToken || !notificationPreferences) return;
@@ -134,26 +195,6 @@ const Settings: React.FC = () => {
             setError('Не удалось сохранить настройки уведомлений');
         } finally {
             setNotificationsSaving(false);
-        }
-    };
-
-    const loadUsers = async () => {
-        if (!accessToken) return;
-        
-        try {
-            setUsersLoading(true);
-            setError(null);
-            const resp = await authAPI.getUsers(undefined, includeInactive, accessToken, {
-                page: usersPage,
-                pageSize: usersPageSize,
-            });
-            setUsers(resp.users);
-            setUsersPagination(resp.pagination);
-        } catch (err) {
-            console.error('Failed to load users:', err);
-            setError('Не удалось загрузить пользователей');
-        } finally {
-            setUsersLoading(false);
         }
     };
 
@@ -234,7 +275,7 @@ const Settings: React.FC = () => {
             return;
         }
 
-        const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:'",.<>?/\\|`~]+$/;
+        const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_+\-=\x5b\x5d{};:'",.<>?/\\|`~]+$/;
         if (!passwordPattern.test(newPassword)) {
             setError('Пароль должен содержать только латинские буквы, цифры и специальные символы');
             return;
@@ -272,29 +313,6 @@ const Settings: React.FC = () => {
             setTimeout(() => setError(null), 5000);
         } finally {
             setPasswordChanging(false);
-        }
-    };
-
-    const loadSystemData = async () => {
-        if (!accessToken) return;
-        
-        try {
-            setSystemLoading(true);
-            setError(null);
-            const [info, stats, backupsResp] = await Promise.all([
-                systemAPI.getSystemInfo(accessToken),
-                systemAPI.getPerformanceStats(accessToken),
-                systemAPI.listBackups(accessToken, { page: backupPage, pageSize: backupPageSize }),
-            ]);
-            setSystemInfo(info);
-            setPerformanceStats(stats);
-            setBackups(backupsResp.backups);
-            setBackupsPagination(backupsResp.pagination);
-        } catch (err: any) {
-            console.error('Error loading system data:', err);
-            setError('Не удалось загрузить системную информацию');
-        } finally {
-            setSystemLoading(false);
         }
     };
 
@@ -336,26 +354,6 @@ const Settings: React.FC = () => {
             hour: '2-digit',
             minute: '2-digit'
         });
-    };
-
-    const loadAIPreferences = async () => {
-        if (!accessToken) return;
-        
-        try {
-            setAiLoading(true);
-            setError(null);
-            const [preferences, status] = await Promise.all([
-                aiPreferencesAPI.getPreferences(accessToken),
-                autoDetectionAPI.getStatus(accessToken).catch(() => ({ available: false, message: 'Сервис недоступен' }))
-            ]);
-            setAiPreferences(preferences);
-            setAiStatus(status);
-        } catch (err: any) {
-            console.error('Error loading AI preferences:', err);
-            setError('Не удалось загрузить настройки AI');
-        } finally {
-            setAiLoading(false);
-        }
     };
 
     const saveAIPreferences = async () => {

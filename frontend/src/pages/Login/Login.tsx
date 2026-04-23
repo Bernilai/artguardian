@@ -26,29 +26,6 @@ export const Login: React.FC = () => {
         }
     }, [location.state]);
 
-    const validateForm = (): boolean => {
-        const newErrors: Record<string, string> = {};
-
-        const emailPattern = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-        if (!formData.email.trim()) {
-            newErrors.email = "Введите email";
-        } else if (!emailPattern.test(formData.email)) {
-            newErrors.email = "Некорректный формат email";
-        }
-        
-        const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:'",.<>?/\\|`~]{8,32}$/;
-        if (!formData.password) {
-            newErrors.password = "Введите пароль";
-        } else if (formData.password.length < 8 || formData.password.length > 32) {
-            newErrors.password = "Пароль должен содержать от 8 до 32 символов";
-        } else if (!passwordPattern.test(formData.password) || formData.password.includes(' ')) {
-            newErrors.password  = "Пароль содержит недопустимые символы или пробелы";
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({
@@ -78,7 +55,7 @@ export const Login: React.FC = () => {
         // Validate password using native HTML5 validation
         const passwordInput = document.getElementById('password') as HTMLInputElement;
         if (passwordInput) {
-            const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:'",.<>?/\\|`~]{8,32}$/;
+            const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_+\-=\x5b\x5d{};:'",.<>?/\\|`~]{8,32}$/;
             if (!formData.password) {
                 passwordInput.setCustomValidity("Введите пароль");
             } else if (formData.password.length < 8 || formData.password.length > 32) {

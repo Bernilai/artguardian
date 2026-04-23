@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {ArtifactList, LoadingSpinner, ArtifactForm, ArtifactDetail, Toast, ToastType, ListPaginationBar, Seo} from "../../components";
 import {Artifact, ArtifactStatus} from "../../types";
@@ -32,13 +32,14 @@ const Collection: React.FC = () => {
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>(listPrefsBoot.sortDir);
     const [page, setPage] = useState<number>(listPrefsBoot.page);
     const [pageSize, setPageSize] = useState<number>(listPrefsBoot.pageSize);
-    const { accessToken, user } = useAuth();
+    const { accessToken } = useAuth();
     /** Boolean only — JWT refresh replaces the string and would retrigger effects if we depended on `accessToken`. */
     const hasAuthToken = !!accessToken;
     const refetchRef = useRef(refetch);
     refetchRef.current = refetch;
     /** First run after mount: keep restored `page`; later filter/sort/search changes reset to page 1. */
-    const isInitialCollectionFilterEffectRef = useRef(true);
+    const isFirstListLoadRef = useRef(true);
+    const prevListFiltersKeyRef = useRef('');
     const prevRouteArtifactIdRef = useRef<string | undefined>(undefined);
 
     // Deep link: /collection/artifact/:artifactId
@@ -81,29 +82,42 @@ const Collection: React.FC = () => {
         prevRouteArtifactIdRef.current = routeArtifactId;
     }, [routeArtifactId]);
 
-    const buildFetchParams = (qOverride?: string, pageOverride?: number, pageSizeOverride?: number) => {
-        return {
-            q: qOverride !== undefined ? (qOverride || undefined) : (debouncedSearch || undefined),
-            status: statusFilter,
-            collection: collectionFilter || undefined,
-            page: pageOverride ?? page,
-            pageSize: pageSizeOverride ?? pageSize,
-            sortBy,
-            sortDir
-        };
-    };
+    const listFiltersKey = useMemo(
+        () =>
+            JSON.stringify({
+                debouncedSearch,
+                statusFilter,
+                collectionFilter,
+                sortBy,
+                sortDir,
+            }),
+        [debouncedSearch, statusFilter, collectionFilter, sortBy, sortDir]
+    );
+
+    const buildFetchParams = useCallback(
+        (qOverride?: string, pageOverride?: number, pageSizeOverride?: number) => {
+            return {
+                q: qOverride !== undefined ? (qOverride || undefined) : (debouncedSearch || undefined),
+                status: statusFilter,
+                collection: collectionFilter || undefined,
+                page: pageOverride ?? page,
+                pageSize: pageSizeOverride ?? pageSize,
+                sortBy,
+                sortDir,
+            };
+        },
+        [debouncedSearch, statusFilter, collectionFilter, page, pageSize, sortBy, sortDir]
+    );
 
     const goToPage = (nextPage: number) => {
         const safePage = Math.max(1, nextPage);
         setPage(safePage);
-        refetch(buildFetchParams(undefined, safePage));
     };
 
     const handlePageSizeChange = (nextPageSize: number) => {
         const safeSize = Math.max(1, nextPageSize);
         setPageSize(safeSize);
         setPage(1);
-        refetch(buildFetchParams(undefined, 1, safeSize));
     };
 
     useEffect(() => {
@@ -129,30 +143,27 @@ const Collection: React.FC = () => {
     // Depend on `hasAuthToken` so we load when the user becomes authenticated, but not on every silent refresh.
     useEffect(() => {
         if (!hasAuthToken) return;
-        if (isInitialCollectionFilterEffectRef.current) {
-            isInitialCollectionFilterEffectRef.current = false;
-            refetchRef.current({
-                q: debouncedSearch || undefined,
-                status: statusFilter,
-                collection: collectionFilter || undefined,
-                page,
-                pageSize,
-                sortBy,
-                sortDir,
-            });
+
+        if (isFirstListLoadRef.current) {
+            isFirstListLoadRef.current = false;
+            prevListFiltersKeyRef.current = listFiltersKey;
+            refetchRef.current(buildFetchParams());
             return;
         }
-        setPage(1);
-        refetchRef.current({
-            q: debouncedSearch || undefined,
-            status: statusFilter,
-            collection: collectionFilter || undefined,
-            page: 1,
-            pageSize,
-            sortBy,
-            sortDir,
-        });
-    }, [debouncedSearch, statusFilter, collectionFilter, sortBy, sortDir, hasAuthToken]);
+
+        const filtersChanged = prevListFiltersKeyRef.current !== listFiltersKey;
+        if (filtersChanged) {
+            prevListFiltersKeyRef.current = listFiltersKey;
+            if (page !== 1) {
+                setPage(1);
+                return;
+            }
+            refetchRef.current(buildFetchParams(undefined, 1));
+            return;
+        }
+
+        refetchRef.current(buildFetchParams());
+    }, [hasAuthToken, listFiltersKey, page, pageSize, buildFetchParams]);
 
     const handleArtifactClick = (artifact: Artifact) => {
         setSelectedArtifact(artifact);

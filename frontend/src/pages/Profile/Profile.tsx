@@ -44,7 +44,7 @@ const Profile: React.FC = () => {
         }
 
         // Check for only Latin letters, numbers, and special characters
-        const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:'",.<>?/\\|`~]+$/;
+        const passwordPattern = /^[A-Za-z0-9!@#$%^&*()_+\-=\x5b\x5d{};:'",.<>?/\\|`~]+$/;
         if (!passwordPattern.test(passwordForm.newPassword)) {
             setError('Пароль должен содержать только латинские буквы, цифры и специальные символы');
             return;

@@ -258,15 +258,6 @@ const Tickets: React.FC = () => {
         }
     };
 
-    const getStatusLabel = (status: TicketStatus): string => {
-        const labels: Record<TicketStatus, string> = {
-            open: 'Открыт',
-            in_progress: 'В работе',
-            completed: 'Завершен'
-        };
-        return labels[status];
-    };
-
     const getPriorityLabel = (priority: TicketPriority): string => {
         const labels: Record<TicketPriority, string> = {
             low: 'Низкий',

@@ -26,7 +26,10 @@ const ListPaginationBar: React.FC<ListPaginationBarProps> = ({
     const totalPages = pagination.totalPages || 1;
 
     return (
-        <div className={['list-pagination-bar', className].filter(Boolean).join(' ')}>
+        <div
+            className={['list-pagination-bar', className].filter(Boolean).join(' ')}
+            data-testid="list-pagination-bar"
+        >
             <button
                 type="button"
                 className="btn btn-primary"
