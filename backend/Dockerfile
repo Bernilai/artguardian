@@ -9,6 +9,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends postgresql-clie
 COPY --from=builder /install /usr/local
 COPY app/ ./app/
 COPY entrypoint.sh ./entrypoint.sh
-RUN chmod +x entrypoint.sh
+RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
 EXPOSE 8000
 ENTRYPOINT ["./entrypoint.sh"]
