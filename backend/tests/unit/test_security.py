@@ -99,7 +99,12 @@ def test_verify_access_token_returns_none_for_expired_token():
 
 def test_verify_access_token_returns_none_for_tampered_token():
     token = create_access_token({"sub": "tamper-user"})
-    tampered = token[:-1] + ("a" if token[-1] != "a" else "b")
+    header, payload, sig = token.split(".", 2)
+    # HS256 signatures are base64url-encoded; only flipping the *last* character
+    # can decode to the same HMAC bytes (padding-bit malleability), so the
+    # token still verifies. Tamper with the first signature character instead.
+    new_first = "A" if sig[0] != "A" else "B"
+    tampered = f"{header}.{payload}.{new_first}{sig[1:]}"
     assert verify_access_token(tampered) is None
 
 
