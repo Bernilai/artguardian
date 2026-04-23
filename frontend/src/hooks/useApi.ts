@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Artifact, ArtifactStatus, PaginationInfo } from '../types';
 import { artifactsAPI } from '../services';
 import { useAuth } from '../contexts';
@@ -68,6 +68,14 @@ export const useApi = () => {
         },
         [accessToken]
     );
+
+    useEffect(() => {
+        if (!accessToken) {
+            setLoading(false);
+            return;
+        }
+        void fetchArtifacts();
+    }, [accessToken, fetchArtifacts]);
 
     return {
         artifacts,
