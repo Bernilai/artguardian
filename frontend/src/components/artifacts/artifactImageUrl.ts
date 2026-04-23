@@ -1,16 +1,7 @@
 import type { Artifact } from '../../types';
 
-/** Inline SVG — avoids missing `public/images/placeholder-artifact.jpg` causing onError → reload loops. */
-export const FALLBACK_ARTIFACT_IMAGE_SRC =
-    'data:image/svg+xml,' +
-    encodeURIComponent(
-        '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="384" viewBox="0 0 512 384">' +
-            '<rect fill="%232a2a2a" width="512" height="384"/>' +
-            '<g fill="none" stroke="%23555" stroke-width="2">' +
-            '<path d="M160 260 L256 140 L352 260 Z"/><circle cx="196" cy="156" r="18"/></g>' +
-            '<text x="256" y="320" fill="%23888" font-size="20" text-anchor="middle" font-family="system-ui,sans-serif">Нет фото</text>' +
-            '</svg>'
-    );
+/** Placeholder when there is no usable primary image URL. */
+export const FALLBACK_ARTIFACT_IMAGE_SRC = '/images/placeholder-artifact.jpg';
 
 /**
  * Only return URLs the browser can load directly in <img>.
@@ -25,6 +16,14 @@ export function getArtifactImageUrl(imagePath: string): string {
     }
     if (t.startsWith('data:')) {
         return t;
+    }
+    if (t.startsWith('/')) {
+        return t;
+    }
+    // Простое имя файла — относительный путь в каталог `/images/` на SPA-хосте.
+    // Ключи вида `artifacts/uuid.jpg` (MinIO) не превращаем в URL: иначе хост отдаёт HTML и ловим ORB в Chrome.
+    if (!t.includes('/')) {
+        return `/images/${t}`;
     }
     return '';
 }
