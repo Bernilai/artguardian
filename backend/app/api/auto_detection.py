@@ -219,6 +219,8 @@ async def auto_detect_damage(
             "detection_ids": [d.id for d in created_detections]
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in automatic detection: {e}", exc_info=True)
         await db.rollback()
