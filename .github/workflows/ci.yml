@@ -34,17 +34,8 @@ jobs:
       - name: Install backend dependencies
         run: pip install -r requirements.txt
 
-      - name: Run lint if available
-        run: |
-          if python -m pip show ruff > /dev/null 2>&1; then
-            echo "ruff detected, running lint."
-            python -m ruff check .
-          elif python -m pip show flake8 > /dev/null 2>&1; then
-            echo "flake8 detected, running lint."
-            python -m flake8 .
-          else
-            echo "No ruff/flake8 found in dependencies, skipping lint."
-          fi
+      - name: Run ruff lint
+        run: python -m ruff check .
 
       - name: Run pytest if tests exist
         run: |
@@ -81,14 +72,8 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Run lint if script exists
-        run: |
-          if npm run | grep -qE "^[[:space:]]+lint$"; then
-            echo "lint script found, running lint."
-            npm run lint
-          else
-            echo "No lint script found in package.json, skipping lint."
-          fi
+      - name: Run ESLint
+        run: npm run lint
 
       - name: Run frontend tests
         run: npm test -- --watchAll=false --passWithNoTests
@@ -154,3 +139,33 @@ jobs:
 
       - name: Validate docker-compose configuration
         run: docker compose config
+
+  deploy:
+    name: Deploy (self-hosted)
+    runs-on: [self-hosted, Windows, X64, artguardian]
+    needs:
+      - backend-lint-test
+      - frontend-lint-test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Start services
+        run: docker compose up -d --build
+      - name: Wait for backend health
+        run: |
+          $retries = 10
+          $delay = 10
+          for ($i = 0; $i -lt $retries; $i++) {
+            try {
+              $response = Invoke-WebRequest -Uri "http://localhost:8000/health" -UseBasicParsing -TimeoutSec 5
+              if ($response.StatusCode -eq 200) {
+                Write-Host "Backend is healthy"
+                exit 0
+              }
+            } catch {}
+            Write-Host "Waiting for backend... attempt $($i+1)"
+            Start-Sleep -Seconds $delay
+          }
+          Write-Host "Backend did not become healthy in time"
+          exit 1
+        shell: pwsh
