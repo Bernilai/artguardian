@@ -11,7 +11,7 @@ export interface RefreshTokenCallback {
     (): Promise<string>;
 }
 
-class ApiService {
+export class ApiService {
     private baseURL: string;
     private refreshPromise: Promise<string> | null = null;
     private refreshCallback: RefreshTokenCallback | null = null;
