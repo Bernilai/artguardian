@@ -13,6 +13,9 @@ module.exports = {
   moduleNameMapper: {
     "\\.(css|less|scss|sass)$": "<rootDir>/src/__tests__/__mocks__/styleMock.js",
     "\\.(gif|ttf|eot|svg|png|jpg|jpeg|webp)$": "<rootDir>/src/__tests__/__mocks__/fileMock.js",
+    "^react-router-dom$": "<rootDir>/node_modules/react-router-dom/dist/index.js",
+    "^react-router/dom$": "<rootDir>/node_modules/react-router/dist/development/dom-export.js",
+    "^react-router$": "<rootDir>/node_modules/react-router/dist/development/index.js",
   },
   coverageThreshold: {
     global: {
