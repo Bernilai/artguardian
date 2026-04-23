@@ -132,7 +132,7 @@ jobs:
           MINIO_SECURE=false
           MINIO_REGION=us-east-1
           MINIO_PUBLIC_URL=http://localhost:9000
-          CORS_ORIGINS=http://localhost,http://127.0.0.1
+          CORS_ORIGINS=http://localhost:3000
           BACKEND_PORT=${BACKEND_PORT}
           FRONTEND_PORT=${FRONTEND_PORT}
           EOF
@@ -203,4 +203,3 @@ jobs:
           }
           Write-Host "Backend did not become healthy in time"
           exit 1
-        shell: pwsh
