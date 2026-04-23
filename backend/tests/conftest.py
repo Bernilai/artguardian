@@ -105,6 +105,26 @@ async def admin_user(db_session: AsyncSession) -> User:
 
 
 @pytest_asyncio.fixture(scope="function")
+async def viewer_token(viewer_user: User) -> str:
+    return create_access_token({"sub": viewer_user.id, "email": viewer_user.email})
+
+
+@pytest_asyncio.fixture(scope="function")
+async def admin_token(admin_user: User) -> str:
+    return create_access_token({"sub": admin_user.id, "email": admin_user.email})
+
+
+@pytest_asyncio.fixture(scope="function")
+async def curator_token(curator_user: User) -> str:
+    return create_access_token({"sub": curator_user.id, "email": curator_user.email})
+
+
+@pytest_asyncio.fixture(scope="function")
+async def restorer_token(restorer_user: User) -> str:
+    return create_access_token({"sub": restorer_user.id, "email": restorer_user.email})
+
+
+@pytest_asyncio.fixture(scope="function")
 async def valid_access_token(admin_user: User) -> str:
     return create_access_token({"sub": admin_user.id, "role": admin_user.role})
 

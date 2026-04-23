@@ -132,7 +132,7 @@ jobs:
           MINIO_SECURE=false
           MINIO_REGION=us-east-1
           MINIO_PUBLIC_URL=http://localhost:9000
-          CORS_ORIGINS=http://localhost:3000
+          CORS_ORIGINS=http://localhost,http://127.0.0.1
           BACKEND_PORT=${BACKEND_PORT}
           FRONTEND_PORT=${FRONTEND_PORT}
           EOF
@@ -149,9 +149,44 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Create .env file
+        shell: pwsh
+        run: |
+          @"
+          POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          POSTGRES_INITDB_ARGS=${{ secrets.POSTGRES_INITDB_ARGS }}
+          DATABASES_USER=${{ secrets.DATABASES_USER }}
+          DATABASES_PASSWORD=${{ secrets.DATABASES_PASSWORD }}
+          MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}
+          MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}
+          PGADMIN_DEFAULT_EMAIL=${{ secrets.PGADMIN_DEFAULT_EMAIL }}
+          PGADMIN_DEFAULT_PASSWORD=${{ secrets.PGADMIN_DEFAULT_PASSWORD }}
+          SECRET_KEY=${{ secrets.SECRET_KEY }}
+          ALGORITHM=${{ secrets.ALGORITHM }}
+          ACCESS_TOKEN_EXPIRE_MINUTES=${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}
+          REFRESH_TOKEN_EXPIRE_DAYS=${{ secrets.REFRESH_TOKEN_EXPIRE_DAYS }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }}
+          MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}
+          MINIO_ENDPOINT=${{ secrets.MINIO_ENDPOINT }}
+          MINIO_BUCKET_NAME=${{ secrets.MINIO_BUCKET_NAME }}
+          MINIO_SECURE=${{ secrets.MINIO_SECURE }}
+          MINIO_REGION=${{ secrets.MINIO_REGION }}
+          MINIO_PUBLIC_URL=${{ secrets.MINIO_PUBLIC_URL }}
+          CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+          BACKEND_PORT=${{ secrets.BACKEND_PORT }}
+          FRONTEND_PORT=${{ secrets.FRONTEND_PORT }}
+          "@ | Set-Content -Path ".env" -Encoding ascii
+
       - name: Start services
+        shell: pwsh
         run: docker compose up -d --build
+
       - name: Wait for backend health
+        shell: pwsh
         run: |
           $retries = 10
           $delay = 10

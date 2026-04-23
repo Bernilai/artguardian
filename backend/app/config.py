@@ -48,7 +48,7 @@ class Settings:
 
     # Public frontend URL (canonical links, sitemap, robots); trailing slash
     # stripped at use site
-    PUBLIC_SITE_URL: str = os.getenv("PUBLIC_SITE_URL", "http://localhost:3000").rstrip(
+    PUBLIC_SITE_URL: str = os.getenv("PUBLIC_SITE_URL", "http://localhost").rstrip(
         "/"
     )
 
