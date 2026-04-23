@@ -1,12 +1,14 @@
 # /app/security.py
+import hashlib
+import logging
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+
 from app.config import settings
-import secrets
-import logging
-import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +31,12 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         # Для bcrypt обрабатываем длинные пароли так же, как при хэшировании
         password_to_verify = plain_password
         if pwd_context.default_scheme() == "bcrypt":
-            password_bytes = plain_password.encode('utf-8')
+            password_bytes = plain_password.encode("utf-8")
             if len(password_bytes) > 72:
-                # Если пароль был предварительно хэширован, хэшируем и проверяемый пароль
+                # Если пароль был предварительно хэширован, хэшируем
+                # и проверяемый пароль
                 password_to_verify = hashlib.sha256(password_bytes).hexdigest()
-        
+
         return pwd_context.verify(password_to_verify, hashed_password)
     except Exception as e:
         logger.error(f"Password verification error: {str(e)}")
@@ -45,11 +48,13 @@ def get_password_hash(password: str) -> str:
         # Для bcrypt обрабатываем длинные пароли
         if pwd_context.default_scheme() == "bcrypt":
             # Преобразуем в байты для проверки длины
-            password_bytes = password.encode('utf-8')
+            password_bytes = password.encode("utf-8")
             if len(password_bytes) > 72:
-                logger.warning("Password too long for bcrypt, using SHA-256 pre-hashing")
-                # Хэшируем пароль перед передачей в bcrypt, чтобы обойти ограничение длины
-                # Используем hexdigest для получения строки фиксированной длины
+                logger.warning(
+                    "Password too long for bcrypt, using SHA-256 pre-hashing"
+                )
+                # Хэшируем пароль перед bcrypt, чтобы обойти ограничение длины.
+                # Используем hexdigest для строки фиксированной длины
                 password = hashlib.sha256(password_bytes).hexdigest()
 
         return pwd_context.hash(password)
@@ -64,10 +69,14 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         if expires_delta:
             expire = datetime.now(timezone.utc) + expires_delta
         else:
-            expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            expire = datetime.now(timezone.utc) + timedelta(
+                minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+            )
 
         to_encode.update({"exp": expire})
-        encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+        encoded_jwt = jwt.encode(
+            to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
+        )
         return encoded_jwt
     except Exception as e:
         logger.error(f"Access token creation error: {str(e)}")
@@ -84,7 +93,9 @@ def create_refresh_token() -> str:
 
 def verify_access_token(token: str) -> Optional[dict]:
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
         return payload
     except JWTError as e:
         logger.warning(f"JWT verification failed: {str(e)}")

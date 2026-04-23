@@ -15,12 +15,15 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# (seed -> { items, dept_count, ts }); LRU + TTL. Survives across requests (same process).
+# (seed -> { items, dept_count, ts }); LRU + TTL. Survives across requests
+# (same process).
 _deck_cache_lock = threading.Lock()
 _deck_cache: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
 
 
-def _deck_cache_get(seed: str, ttl_sec: float) -> Optional[Tuple[List[Dict[str, Any]], Optional[int]]]:
+def _deck_cache_get(
+    seed: str, ttl_sec: float
+) -> Optional[Tuple[List[Dict[str, Any]], Optional[int]]]:
     now = time.monotonic()
     with _deck_cache_lock:
         entry = _deck_cache.get(seed)
@@ -88,7 +91,10 @@ class MetMuseumService:
             follow_redirects=True,
             trust_env=True,
             limits=httpx.Limits(max_keepalive_connections=20, max_connections=40),
-            headers={"Accept": "application/json", "User-Agent": "ArtGuardian/1.0 (museum reference)"},
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "ArtGuardian/1.0 (museum reference)",
+            },
         )
 
     async def _get_json(self, path_with_query: str) -> Optional[dict]:
@@ -137,7 +143,9 @@ class MetMuseumService:
             logger.error("Met Museum API gave up on %s: %s", url, last_err)
         return None
 
-    async def _get_json_client(self, client: httpx.AsyncClient, path_with_query: str) -> Optional[dict]:
+    async def _get_json_client(
+        self, client: httpx.AsyncClient, path_with_query: str
+    ) -> Optional[dict]:
         """Single GET on a shared client (connection reuse for dashboards)."""
         url = f"{self.base_url}{path_with_query}"
         for _attempt in range(2):
@@ -154,7 +162,9 @@ class MetMuseumService:
                 await asyncio.sleep(0.2)
         return None
 
-    async def _get_object(self, client: httpx.AsyncClient, object_id: int) -> Optional[dict]:
+    async def _get_object(
+        self, client: httpx.AsyncClient, object_id: int
+    ) -> Optional[dict]:
         """GET /objects/{id} with small retry loop (429 / 5xx / timeout)."""
         url = f"{self.base_url}/objects/{object_id}"
         delay = 0.45
@@ -173,7 +183,11 @@ class MetMuseumService:
             except httpx.TimeoutException:
                 await asyncio.sleep(delay * (attempt + 1))
             except httpx.HTTPStatusError as e:
-                logger.debug("Met Museum object %s HTTP %s", object_id, e.response.status_code if e.response else "?")
+                logger.debug(
+                    "Met Museum object %s HTTP %s",
+                    object_id,
+                    e.response.status_code if e.response else "?",
+                )
                 if e.response is not None and e.response.status_code >= 500:
                     await asyncio.sleep(delay * (attempt + 1))
                     continue
@@ -184,7 +198,10 @@ class MetMuseumService:
         return None
 
     def _candidate_merge_cap(self) -> int:
-        return min(max(self.pool_cap * self._candidate_factor, self.pool_cap + 120), self._candidate_cap_max)
+        return min(
+            max(self.pool_cap * self._candidate_factor, self.pool_cap + 120),
+            self._candidate_cap_max,
+        )
 
     async def _gather_object_ids(
         self,
@@ -193,7 +210,8 @@ class MetMuseumService:
         merge_cap: int,
     ) -> Tuple[List[int], bool, bool]:
         """
-        Merge unique object IDs until merge_cap. Streams Met `objectIDs` — never scans 50k in Python.
+        Merge unique object IDs until merge_cap.
+        Streams Met `objectIDs` — never scans 50k in Python.
         """
         any_success = False
         saw_empty = False
@@ -203,7 +221,9 @@ class MetMuseumService:
         def absorb_payload(payload: Optional[dict]) -> None:
             nonlocal saw_empty
             raw_ids = payload.get("objectIDs") if payload else None
-            if payload is not None and (not isinstance(raw_ids, list) or len(raw_ids) == 0):
+            if payload is not None and (
+                not isinstance(raw_ids, list) or len(raw_ids) == 0
+            ):
                 saw_empty = True
             if not isinstance(raw_ids, list):
                 return
@@ -239,8 +259,10 @@ class MetMuseumService:
                 any_success = True
             absorb_payload(payload)
 
-        if len(merged) < merge_cap and departments_payload and isinstance(
-            departments_payload.get("departments"), list
+        if (
+            len(merged) < merge_cap
+            and departments_payload
+            and isinstance(departments_payload.get("departments"), list)
         ):
             for dept in departments_payload["departments"][:10]:
                 if len(merged) >= merge_cap:
@@ -276,7 +298,7 @@ class MetMuseumService:
         target: int,
         max_fetches: int,
     ) -> List[Dict[str, Any]]:
-        """Preserve candidate order; build card dicts for Met objects that have a display image."""
+        """Preserve candidate order; build cards for Met objects with images."""
         deck: List[Dict[str, Any]] = []
         if target <= 0 or not candidates or max_fetches <= 0:
             return deck
@@ -291,7 +313,9 @@ class MetMuseumService:
 
         idx = 0
         while len(deck) < target and idx < len(candidates) and fetches < max_fetches:
-            chunk_len = min(self._resolve_concurrency, max_fetches - fetches, len(candidates) - idx)
+            chunk_len = min(
+                self._resolve_concurrency, max_fetches - fetches, len(candidates) - idx
+            )
             if chunk_len <= 0:
                 break
             chunk = candidates[idx : idx + chunk_len]
@@ -332,7 +356,8 @@ class MetMuseumService:
         page_size: int,
     ) -> Dict[str, Any]:
         """
-        One deck per `seed` (cached): full card rows built once. Page `p` is a slice — no second Met round-trip.
+        One deck per `seed` (cached): full card rows built once.
+        Page `p` is a slice — no second Met round-trip.
         """
         cached = _deck_cache_get(seed, self.deck_cache_ttl_sec)
         deck_items: Optional[List[Dict[str, Any]]] = None
@@ -342,7 +367,9 @@ class MetMuseumService:
             if cached:
                 deck_items, dept_count = cached
             else:
-                departments_payload = await self._get_json_client(client, "/departments")
+                departments_payload = await self._get_json_client(
+                    client, "/departments"
+                )
                 dept_count = None
                 if departments_payload and "departments" in departments_payload:
                     dept_list = departments_payload.get("departments") or []
@@ -360,17 +387,21 @@ class MetMuseumService:
                     if not any_ok:
                         err = (
                             "Не удалось связаться с API Met Museum с сервера "
-                            "(нет интернета, блокировка HTTPS, proxy или слишком короткий таймаут). "
-                            "Проверьте доступ к https://collectionapi.metmuseum.org и переменные "
-                            "HTTPS_PROXY / MET_MUSEUM_API_BASE_URL / MET_MUSEUM_TIMEOUT."
+                            "(нет интернета, блокировка HTTPS, proxy или "
+                            "слишком короткий таймаут). Проверьте доступ к "
+                            "https://collectionapi.metmuseum.org и переменные "
+                            "HTTPS_PROXY / MET_MUSEUM_API_BASE_URL / "
+                            "MET_MUSEUM_TIMEOUT."
                         )
                     else:
                         err = (
                             "Поиск Met Museum не вернул объектов с изображениями. "
-                            "Попробуйте позже или увеличьте MET_MUSEUM_TIMEOUT."
+                            "Попробуйте позже или увеличьте "
+                            "MET_MUSEUM_TIMEOUT."
                         )
                     logger.warning(
-                        "Met Museum inspiration: no object IDs (any_ok=%s saw_empty=%s base=%s)",
+                        "Met Museum inspiration: no object IDs "
+                        "(any_ok=%s saw_empty=%s base=%s)",
                         any_ok,
                         saw_empty,
                         self.base_url,
@@ -396,7 +427,8 @@ class MetMuseumService:
 
                 if not deck_items:
                     logger.warning(
-                        "Met Museum inspiration: empty deck after resolve (candidates=%s max_fetch=%s base=%s)",
+                        "Met Museum inspiration: empty deck after resolve "
+                        "(candidates=%s max_fetch=%s base=%s)",
                         len(base),
                         max_fetch,
                         self.base_url,

@@ -1,7 +1,9 @@
 """
 Reference content from The Metropolitan Museum of Art public API.
-Authenticated users only; failures degrade to empty payload (never 5xx solely due to Met downtime).
+Authenticated users only; failures degrade to empty payload
+(never 5xx solely due to Met downtime).
 """
+
 import logging
 import secrets
 from typing import Annotated, Optional
@@ -30,10 +32,14 @@ async def museum_inspiration(
         None,
         min_length=8,
         max_length=128,
-        description="Shuffle deck id from a prior response; omit for a new random deck.",
+        description=(
+            "Shuffle deck id from a prior response; omit for a new random deck."
+        ),
     ),
 ):
-    effective_size = max(1, min(page_size, settings.MET_MUSEUM_INSPIRATION_PAGE_SIZE_MAX))
+    effective_size = max(
+        1, min(page_size, settings.MET_MUSEUM_INSPIRATION_PAGE_SIZE_MAX)
+    )
     deck_seed = seed or secrets.token_hex(8)
 
     try:

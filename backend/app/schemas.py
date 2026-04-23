@@ -14,7 +14,7 @@ class UserBase(BaseModel):
     @field_validator("email")
     @classmethod
     def validate_email(cls, v: str) -> str:
-        pattern = r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+        pattern = r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
         if not re.match(pattern, v):
             raise ValueError("Некорректный формат email адреса")
         return v.lower()
@@ -25,9 +25,11 @@ class UserBase(BaseModel):
         if not v or not v.strip():
             raise ValueError("Имя не может быть пустым")
 
-        pattern = r'^[А-Яа-яЁё \-\']+$'
+        pattern = r"^[А-Яа-яЁё \-\']+$"
         if not re.match(pattern, v):
-            raise ValueError("Имя должно содержать только русские буквы, пробелы дефисы и апострофы")
+            raise ValueError(
+                "Имя должно содержать только русские буквы, пробелы дефисы и апострофы"
+            )
         return v.strip()
 
 
@@ -40,15 +42,16 @@ class UserCreate(UserBase):
         if len(v) < 8 or len(v) > 32:
             raise ValueError("Пароль должен содержать от 8 до 32 символов")
 
-        if ' ' in v:
+        if " " in v:
             raise ValueError("Пароль не должен содержать пробелы")
 
         pattern = r'^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:\'",.<>?/\\|`~]+$'
         if not re.match(pattern, v):
             raise ValueError(
-                "Пароль должен содержать только латинские буквы, цифры и специальные символы"
+                "Пароль должен содержать только латинские буквы, цифры "
+                "и специальные символы"
             )
-            
+
         return v
 
 
@@ -80,13 +83,14 @@ class AdminPasswordChange(BaseModel):
         if len(v) < 8 or len(v) > 32:
             raise ValueError("Пароль должен содержать от 8 до 32 символов")
 
-        if ' ' in v:
+        if " " in v:
             raise ValueError("Пароль не должен содержать пробелы")
 
         pattern = r'^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:\'",.<>?/\\|`~]+$'
         if not re.match(pattern, v):
             raise ValueError(
-                "Пароль должен содержать только латинские буквы, цифры и специальные символы"
+                "Пароль должен содержать только латинские буквы, цифры "
+                "и специальные символы"
             )
 
         return v
@@ -116,7 +120,7 @@ class LoginRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def validate_email(cls, v: str) -> str:
-        pattern = r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+        pattern = r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
         if not re.match(pattern, v):
             raise ValueError("Некорректный формат email адреса")
         return v.lower()
@@ -127,13 +131,14 @@ class LoginRequest(BaseModel):
         if len(v) < 8 or len(v) > 32:
             raise ValueError("Пароль должен содержать от 8 до 32 символов")
 
-        if ' ' in v:
+        if " " in v:
             raise ValueError("Пароль не должен содержать пробелы")
 
         pattern = r'^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};:\'",.<>?/\\|`~]+$'
         if not re.match(pattern, v):
             raise ValueError(
-                "Пароль должен содержать только латинские буквы, цифры и специальные символы"
+                "Пароль должен содержать только латинские буквы, цифры "
+                "и специальные символы"
             )
 
         return v
@@ -195,8 +200,12 @@ class ArtifactBase(BaseModel):
 
 class ArtifactCreate(ArtifactBase):
     image_path: Optional[str] = None  # MinIO object path
-    status: Optional[str] = None  # Status: no_defects, has_defects, requires_attention, under_restoration
-    creation_date: Optional[str] = None  # Дата создания артефакта (может быть приблизительной "XVIII век")
+    status: Optional[str] = (
+        None  # Status: no_defects, has_defects, requires_attention, under_restoration
+    )
+    creation_date: Optional[str] = (
+        None  # Дата создания артефакта (может быть приблизительной "XVIII век")
+    )
 
 
 class ArtifactResponse(ArtifactBase):
@@ -251,7 +260,7 @@ class TicketResponse(TicketBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    
+
     # Related data
     artifact_title: Optional[str] = None
     assigned_to_name: Optional[str] = None
@@ -355,7 +364,7 @@ class AIPreferencesBase(BaseModel):
             "example": {
                 "auto_create_tickets": False,
                 "min_confidence": 0.9,
-                "enabled": True
+                "enabled": True,
             }
         }
     )

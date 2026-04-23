@@ -53,13 +53,7 @@ async def sitemap_xml():
 @router.get("/robots.txt", response_class=PlainTextResponse)
 async def robots_txt():
     base = _origin()
-    body = (
-        "User-agent: *\n"
-        "Allow: /\n"
-        "Disallow: /api/\n"
-        "\n"
-        f"Sitemap: {base}/sitemap.xml\n"
-    )
+    body = f"User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: {base}/sitemap.xml\n"
     return PlainTextResponse(
         content=body,
         headers={"Cache-Control": "public, max-age=86400"},
@@ -81,7 +75,10 @@ async def json_ld_site():
                 "@type": "WebSite",
                 "name": settings.APP_NAME,
                 "url": _origin() + "/",
-                "description": "Платформа учёта и сохранности музейных артефактов, тикетов реставрации и аналитики.",
+                "description": (
+                    "Платформа учёта и сохранности музейных артефактов, "
+                    "тикетов реставрации и аналитики."
+                ),
                 "inLanguage": "ru",
             },
             {

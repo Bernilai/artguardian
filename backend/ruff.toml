@@ -1,5 +1,5 @@
 line-length = 88
-exclude = ["tests/", "alembic/"]
+exclude = ["tests/", "alembic/", "artdet/", "**/*.ipynb"]
 
 [lint]
 select = ["E", "F", "I"]

@@ -3,35 +3,37 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, func, and_
 from starlette.requests import Request
 
 from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_active_user
-from app.models import User, RefreshToken
+from app.models import RefreshToken, User
 from app.schemas import (
+    AdminPasswordChange,
+    LoginRequest,
+    PaginatedUsersResponse,
+    PaginationInfo,
+    PasswordChange,
+    Token,
     UserCreate,
     UserResponse,
     UserUpdate,
-    LoginRequest,
-    Token,
-    RefreshTokenCreate,
-    PasswordChange,
-    AdminPasswordChange,
-    PaginatedUsersResponse,
-    PaginationInfo,
+)
+from app.security import (
+    create_access_token,
+    create_refresh_token,
+    get_password_hash,
+    verify_password,
 )
 from app.utils.notifications import notify_password_changed
-from app.security import (
-    verify_password, get_password_hash, create_access_token,
-    create_refresh_token, verify_access_token
-)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
 
 @router.options("/login")
 @router.options("/register")
@@ -39,6 +41,7 @@ router = APIRouter()
 @router.options("/logout")
 async def options_handler():
     return {"message": "OK"}
+
 
 async def get_user_by_email(db: AsyncSession, email: str):
     """Get user by email using async SQLAlchemy"""
@@ -49,6 +52,7 @@ async def get_user_by_email(db: AsyncSession, email: str):
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
+
 @router.post("/register", response_model=UserResponse)
 async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     try:
@@ -56,10 +60,12 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
 
         db_user = await get_user_by_email(db, user_data.email)
         if db_user:
-            logger.warning(f"Registration failed - email already exists: {user_data.email}")
+            logger.warning(
+                f"Registration failed - email already exists: {user_data.email}"
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
+                detail="Email already registered",
             )
 
         hashed_password = get_password_hash(user_data.password)
@@ -67,28 +73,26 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
             email=user_data.email,
             hashed_password=hashed_password,
             name=user_data.name,
-            role=user_data.role or "viewer"
+            role=user_data.role or "viewer",
         )
 
         db.add(user)
         await db.flush()
         logger.info(f"User added to session, ID: {user.id}")
-        
+
         await db.commit()
         logger.info(f"Database commit successful for user: {user.email}")
-        
+
         await db.refresh(user)
         logger.info(f"User registered successfully: {user.email}, ID: {user.id}")
-        
+
         from app.utils.notifications import notify_user_created
+
         await notify_user_created(
-            db=db,
-            new_user_id=user.id,
-            new_user_name=user.name,
-            new_user_role=user.role
+            db=db, new_user_id=user.id, new_user_name=user.name, new_user_role=user.role
         )
         await db.commit()
-        
+
         return user
 
     except HTTPException:
@@ -98,16 +102,16 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
         logger.error(f"Registration error: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Registration failed: {str(e)}"
+            detail=f"Registration failed: {str(e)}",
         )
 
 
 @router.post("/login", response_model=Token)
 async def login(
-        response: Response,
-        request: Request,
-        login_data: LoginRequest,
-        db: AsyncSession = Depends(get_db)
+    response: Response,
+    request: Request,
+    login_data: LoginRequest,
+    db: AsyncSession = Depends(get_db),
 ):
     try:
         logger.info(f"🔐 Login attempt for email: {login_data.email}")
@@ -124,8 +128,8 @@ async def login(
         result = await db.execute(
             select(RefreshToken).where(
                 RefreshToken.user_id == user.id,
-                RefreshToken.revoked == False,
-                RefreshToken.expires_at > datetime.now(timezone.utc)
+                ~RefreshToken.revoked,
+                RefreshToken.expires_at > datetime.now(timezone.utc),
             )
         )
         existing_token = result.scalar_one_or_none()
@@ -134,7 +138,9 @@ async def login(
 
         if existing_token:
             logger.info(f"🔄 Using existing refresh token for user: {user.email}")
-            existing_token.expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+            existing_token.expires_at = datetime.now(timezone.utc) + timedelta(
+                days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+            )
             refresh_token_value = "existing"  # Маркер, что токен уже существует
         else:
             logger.info(f"🆕 Creating new refresh token for user: {user.email}")
@@ -144,7 +150,8 @@ async def login(
             db_refresh_token = RefreshToken(
                 user_id=user.id,
                 token_hash=refresh_token_hash,
-                expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+                expires_at=datetime.now(timezone.utc)
+                + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
             )
             db.add(db_refresh_token)
             await db.flush()
@@ -165,18 +172,16 @@ async def login(
                 secure=False,
                 samesite="lax",
                 max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-                path="/"
+                path="/",
             )
         else:
-            logger.info(f"🔁 Keeping existing refresh token cookie for: {login_data.email}")
+            logger.info(
+                f"🔁 Keeping existing refresh token cookie for: {login_data.email}"
+            )
 
         logger.info(f"✅ Login successful for: {login_data.email}")
 
-        return Token(
-            access_token=access_token,
-            token_type="bearer",
-            user=user
-        )
+        return Token(access_token=access_token, token_type="bearer", user=user)
 
     except HTTPException:
         # Пробрасываем HTTPException без rollback
@@ -189,9 +194,7 @@ async def login(
 
 @router.post("/refresh", response_model=Token)
 async def refresh_token(
-        request: Request,
-        response: Response,
-        db: AsyncSession = Depends(get_db)
+    request: Request, response: Response, db: AsyncSession = Depends(get_db)
 ):
     try:
         # Получаем refresh token из cookie
@@ -204,8 +207,8 @@ async def refresh_token(
         result = await db.execute(
             select(RefreshToken).where(
                 RefreshToken.token_hash == token_hash,
-                RefreshToken.revoked == False,
-                RefreshToken.expires_at > datetime.now(timezone.utc)
+                ~RefreshToken.revoked,
+                RefreshToken.expires_at > datetime.now(timezone.utc),
             )
         )
         db_token = result.scalar_one_or_none()
@@ -221,15 +224,13 @@ async def refresh_token(
             raise HTTPException(status_code=400, detail="Inactive user")
 
         access_token = create_access_token(data={"sub": user.id, "email": user.email})
-        db_token.expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        db_token.expires_at = datetime.now(timezone.utc) + timedelta(
+            days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+        )
 
         await db.commit()
 
-        return Token(
-            access_token=access_token,
-            token_type="bearer",
-            user=user
-        )
+        return Token(access_token=access_token, token_type="bearer", user=user)
 
     except HTTPException:
         raise
@@ -241,9 +242,7 @@ async def refresh_token(
 
 @router.post("/logout")
 async def logout(
-        request: Request,
-        response: Response,
-        db: AsyncSession = Depends(get_db)
+    request: Request, response: Response, db: AsyncSession = Depends(get_db)
 ):
     try:
         # Получаем refresh token из cookie
@@ -262,10 +261,7 @@ async def logout(
                 await db.commit()
 
         # Удаляем cookie
-        response.delete_cookie(
-            key="refresh_token",
-            path="/"
-        )
+        response.delete_cookie(key="refresh_token", path="/")
 
         return {"message": "Successfully logged out"}
 
@@ -276,7 +272,9 @@ async def logout(
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_profile(current_user: User = Depends(get_current_active_user)):
+async def get_current_user_profile(
+    current_user: User = Depends(get_current_active_user),
+):
     try:
         logger.info(f"Profile request for user: {current_user.email}")
         return current_user
@@ -285,7 +283,7 @@ async def get_current_user_profile(current_user: User = Depends(get_current_acti
         logger.error(f"Error retrieving user profile: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve user profile: {str(e)}"
+            detail=f"Failed to retrieve user profile: {str(e)}",
         )
 
 
@@ -296,12 +294,12 @@ async def get_users(
     page: int = Query(1, ge=1),
     pageSize: int = Query(20, ge=1, le=500, alias="pageSize"),
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Get list of users, optionally filtered by role (paginated)"""
     conditions = []
     if not include_inactive:
-        conditions.append(User.is_active == True)
+        conditions.append(User.is_active)
     if role:
         conditions.append(User.role == role)
 
@@ -315,7 +313,9 @@ async def get_users(
     total_items_result = await db.execute(count_stmt)
     total_items_value = int(total_items_result.scalar_one() or 0)
 
-    total_pages = (total_items_value + pageSize - 1) // pageSize if total_items_value > 0 else 0
+    total_pages = (
+        (total_items_value + pageSize - 1) // pageSize if total_items_value > 0 else 0
+    )
     offset = (page - 1) * pageSize
 
     query = query.offset(offset).limit(pageSize)
@@ -338,33 +338,32 @@ async def update_user(
     user_id: str,
     user_data: UserUpdate,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Update user (admin only)"""
     # Only admins can update users
     if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can update users"
+            detail="Only administrators can update users",
         )
-    
+
     # Find user
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
-    
+
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
-    
+
     # Prevent self-deactivation
     if user_data.is_active is False and user.id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot deactivate your own account"
+            detail="Cannot deactivate your own account",
         )
-    
+
     # Update fields
     if user_data.name is not None:
         user.name = user_data.name
@@ -372,12 +371,12 @@ async def update_user(
         user.role = user_data.role
     if user_data.is_active is not None:
         user.is_active = user_data.is_active
-    
+
     user.updated_at = datetime.now(timezone.utc)
-    
+
     await db.commit()
     await db.refresh(user)
-    
+
     logger.info(f"User {user_id} updated by admin {current_user.id}")
     return UserResponse.model_validate(user)
 
@@ -386,82 +385,83 @@ async def update_user(
 async def delete_user(
     user_id: str,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Delete user (admin only, soft delete by setting is_active=False)"""
     # Only admins can delete users
     if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can delete users"
+            detail="Only administrators can delete users",
         )
-    
+
     # Find user
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
-    
+
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
-    
+
     # Prevent self-deletion
     if user.id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete your own account"
+            detail="Cannot delete your own account",
         )
-    
+
     # Soft delete by setting is_active=False
     user.is_active = False
     user.updated_at = datetime.now(timezone.utc)
-    
+
     await db.commit()
-    
+
     logger.info(f"User {user_id} deactivated by admin {current_user.id}")
     return {"message": "User deactivated successfully"}
 
 
 # Дополнительные эндпоинты для управления сессиями
 
+
 @router.post("/change-password")
 async def change_password(
     password_data: PasswordChange,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Change user's own password"""
     # Verify current password
-    if not verify_password(password_data.current_password, current_user.hashed_password):
+    if not verify_password(
+        password_data.current_password, current_user.hashed_password
+    ):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Текущий пароль неверен"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Текущий пароль неверен"
         )
-    
+
     # Check if new password is different from current
     if verify_password(password_data.new_password, current_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Новый пароль должен отличаться от текущего"
+            detail="Новый пароль должен отличаться от текущего",
         )
-    
+
     # Update password
     current_user.hashed_password = get_password_hash(password_data.new_password)
     current_user.updated_at = datetime.now(timezone.utc)
-    
+
     await db.commit()
     await db.refresh(current_user)
-    
+
     # Notify admins about password change
     await notify_password_changed(
         db=db,
         user_id=current_user.id,
         user_name=current_user.name,
-        changed_by_admin=False
+        changed_by_admin=False,
     )
     await db.commit()
-    
+
     logger.info(f"Password changed for user: {current_user.email}")
     return {"message": "Пароль успешно изменен"}
 
@@ -471,57 +471,60 @@ async def admin_change_user_password(
     user_id: str,
     password_data: AdminPasswordChange,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Change user password (admin only)"""
     # Only admins can change user passwords
     if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can change user passwords"
+            detail="Only administrators can change user passwords",
         )
-    
+
     # Find user
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
-    
+
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
-    
-    # Password validation is handled automatically by Pydantic via AdminPasswordChange schema
+
+    # Password validation is handled automatically by Pydantic via
+    # AdminPasswordChange schema
     # Check if new password is different from current
     if verify_password(password_data.new_password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Новый пароль должен отличаться от текущего"
+            detail="Новый пароль должен отличаться от текущего",
         )
-    
+
     # Update password
     user.hashed_password = get_password_hash(password_data.new_password)
     user.updated_at = datetime.now(timezone.utc)
-    
+
     await db.commit()
     await db.refresh(user)
-    
+
     # Notify admins about password change
     await notify_password_changed(
         db=db,
         user_id=user.id,
         user_name=user.name,
         changed_by_admin=True,
-        admin_name=current_user.name
+        admin_name=current_user.name,
     )
     await db.commit()
-    
+
     logger.info(f"Password changed for user {user.email} by admin {current_user.email}")
     return {"message": f"Пароль пользователя {user.name} успешно изменен"}
 
 
 @router.post("/revoke-all")
-async def revoke_all_tokens(current_user: User = Depends(get_current_active_user), db: AsyncSession = Depends(get_db)):
+async def revoke_all_tokens(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
     try:
         logger.info(f"Revoking all tokens for user: {current_user.email}")
 
@@ -530,7 +533,7 @@ async def revoke_all_tokens(current_user: User = Depends(get_current_active_user
             update(RefreshToken)
             .where(
                 RefreshToken.user_id == current_user.id,
-                RefreshToken.revoked == False
+                ~RefreshToken.revoked,
             )
             .values(revoked=True)
         )
@@ -541,39 +544,47 @@ async def revoke_all_tokens(current_user: User = Depends(get_current_active_user
 
         logger.info(f"Revoked tokens for user: {current_user.email}")
 
-        return {"message": f"All tokens revoked successfully", "revoked_count": revoked_count}
+        return {
+            "message": "All tokens revoked successfully",
+            "revoked_count": revoked_count,
+        }
 
     except Exception as e:
         await db.rollback()
         logger.error(f"Error revoking all tokens: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to revoke tokens: {str(e)}"
+            detail=f"Failed to revoke tokens: {str(e)}",
         )
 
 
 @router.get("/sessions")
-async def get_active_sessions(current_user: User = Depends(get_current_active_user), db: AsyncSession = Depends(get_db)):
+async def get_active_sessions(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
     try:
         logger.info(f"Retrieving active sessions for user: {current_user.email}")
 
         result = await db.execute(
             select(RefreshToken).where(
                 RefreshToken.user_id == current_user.id,
-                RefreshToken.revoked == False,
-                RefreshToken.expires_at > datetime.now(timezone.utc)
+                ~RefreshToken.revoked,
+                RefreshToken.expires_at > datetime.now(timezone.utc),
             )
         )
         active_sessions = result.scalars().all()
 
         sessions_data = []
         for session in active_sessions:
-            sessions_data.append({
-                "id": session.id,
-                "created_at": session.created_at,
-                "expires_at": session.expires_at,
-                "device_info": session.device_info
-            })
+            sessions_data.append(
+                {
+                    "id": session.id,
+                    "created_at": session.created_at,
+                    "expires_at": session.expires_at,
+                    "device_info": session.device_info,
+                }
+            )
 
         return {"sessions": sessions_data, "total": len(sessions_data)}
 
@@ -581,28 +592,29 @@ async def get_active_sessions(current_user: User = Depends(get_current_active_us
         logger.error(f"Error retrieving sessions: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve sessions: {str(e)}"
+            detail=f"Failed to retrieve sessions: {str(e)}",
         )
 
 
 @router.delete("/sessions/{session_id}")
-async def revoke_session(session_id: str, current_user: User = Depends(get_current_active_user),
-                         db: AsyncSession = Depends(get_db)):
+async def revoke_session(
+    session_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
     try:
         logger.info(f"Revoking session {session_id} for user: {current_user.email}")
 
         result = await db.execute(
             select(RefreshToken).where(
-                RefreshToken.id == session_id,
-                RefreshToken.user_id == current_user.id
+                RefreshToken.id == session_id, RefreshToken.user_id == current_user.id
             )
         )
         session = result.scalar_one_or_none()
 
         if not session:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Session not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
             )
 
         session.revoked = True
@@ -620,5 +632,5 @@ async def revoke_session(session_id: str, current_user: User = Depends(get_curre
         logger.error(f"Error revoking session: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to revoke session: {str(e)}"
+            detail=f"Failed to revoke session: {str(e)}",
         )

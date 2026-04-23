@@ -1,21 +1,24 @@
-from typing import List, Optional
 import json
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Depends, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, func
 
 from app.database import get_db
-from app.models import Artifact
-from app.schemas import ArtifactCreate, ArtifactResponse
-from app.dependencies import get_current_active_user, get_optional_current_user, require_curator_or_admin
-from app.models import User
+from app.dependencies import (
+    get_current_active_user,
+    get_optional_current_user,
+    require_curator_or_admin,
+)
+from app.models import Artifact, User
+from app.schemas import ArtifactCreate
 from app.services.minio_service import minio_service
 from app.utils.notifications import (
     notify_artifact_created,
-    notify_artifact_status_changed
+    notify_artifact_status_changed,
 )
 
 logger = logging.getLogger(__name__)
@@ -23,7 +26,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def transform_artifact_response(artifact: Artifact, current_user: Optional[User] = None) -> dict:
+def transform_artifact_response(
+    artifact: Artifact, current_user: Optional[User] = None
+) -> dict:
     """Transform database artifact to frontend format"""
     dimensions = None
     if artifact.dimensions:
@@ -31,7 +36,7 @@ def transform_artifact_response(artifact: Artifact, current_user: Optional[User]
             dimensions = json.loads(artifact.dimensions)
         except (json.JSONDecodeError, TypeError):
             dimensions = {"width": 0, "height": 0, "unit": "cm"}
-    
+
     materials = []
     if artifact.materials:
         try:
@@ -40,27 +45,36 @@ def transform_artifact_response(artifact: Artifact, current_user: Optional[User]
                 materials = [materials] if materials else []
         except (json.JSONDecodeError, TypeError):
             materials = []
-    
+
     images = []
     if artifact.image_path:
-        if artifact.image_path.startswith('http://') or artifact.image_path.startswith('https://'):
+        if artifact.image_path.startswith("http://") or artifact.image_path.startswith(
+            "https://"
+        ):
             images = [artifact.image_path]
         else:
             try:
                 from datetime import timedelta
+
                 presigned_url = minio_service.get_presigned_url(
-                    artifact.image_path,
-                    expires=timedelta(days=7)
+                    artifact.image_path, expires=timedelta(days=7)
                 )
                 images = [presigned_url]
             except Exception as e:
-                logger.warning(f"Could not generate presigned URL for {artifact.image_path}: {e}")
-                # Do not fall back to get_public_url(): for private buckets the browser gets XML/403 (not image/jpeg)
-                # and Chrome reports net::ERR_BLOCKED_BY_ORB on <img>. Presigned URLs are the supported case.
+                logger.warning(
+                    f"Could not generate presigned URL for {artifact.image_path}: {e}"
+                )
+                # Do not fall back to get_public_url(): for private buckets the browser
+                # gets XML/403 (not image/jpeg); Chrome reports ERR_BLOCKED_BY_ORB
+                # on <img>. Presigned URLs are the supported case.
                 images = []
-    
-    show_inspection_info = current_user and current_user.role in ["restorer", "curator", "admin"]
-    
+
+    show_inspection_info = current_user and current_user.role in [
+        "restorer",
+        "curator",
+        "admin",
+    ]
+
     result = {
         "id": artifact.id,
         "title": artifact.title,
@@ -78,16 +92,18 @@ def transform_artifact_response(artifact: Artifact, current_user: Optional[User]
         "createdAt": artifact.created_at.isoformat() if artifact.created_at else "",
         "updatedAt": artifact.updated_at.isoformat() if artifact.updated_at else "",
         "creationDate": artifact.creation_date or "",
-        "restorationHistory": []
+        "restorationHistory": [],
     }
-    
+
     if show_inspection_info:
-        result["lastInspection"] = artifact.last_inspection.isoformat() if artifact.last_inspection else ""
+        result["lastInspection"] = (
+            artifact.last_inspection.isoformat() if artifact.last_inspection else ""
+        )
         if artifact.last_inspector:
             result["lastInspector"] = artifact.last_inspector.name
         else:
             result["lastInspector"] = None
-    
+
     return result
 
 
@@ -96,7 +112,10 @@ async def get_all_artifacts(
     q: Optional[str] = Query(None, description="Search query for artifact name"),
     status: Optional[str] = Query(
         None,
-        description="Artifact status filter (frontend values: good/critical/requires_attention/under_restoration/exhibited)",
+        description=(
+            "Artifact status filter (frontend values: "
+            "good/critical/requires_attention/under_restoration/exhibited)"
+        ),
     ),
     collection: Optional[str] = Query(None, description="Collection filter"),
     page: int = Query(1, ge=1),
@@ -104,7 +123,7 @@ async def get_all_artifacts(
     sortBy: str = Query("created_at", alias="sortBy"),
     sortDir: str = Query("desc", alias="sortDir"),
     current_user: Optional[User] = Depends(get_optional_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Get artifacts with pagination, sorting and optional filters"""
     from sqlalchemy.orm import selectinload
@@ -158,14 +177,19 @@ async def get_all_artifacts(
     total_items_value = total_items.scalar_one() or 0
 
     # totalPages should be 0 when there are no items
-    total_pages = (total_items_value + pageSize - 1) // pageSize if total_items_value > 0 else 0
+    total_pages = (
+        (total_items_value + pageSize - 1) // pageSize if total_items_value > 0 else 0
+    )
 
     page_query = filtered_query.offset(offset).limit(pageSize)
     result = await db.execute(page_query)
     artifacts = result.scalars().all()
 
     return {
-        "artifacts": [transform_artifact_response(artifact, current_user) for artifact in artifacts],
+        "artifacts": [
+            transform_artifact_response(artifact, current_user)
+            for artifact in artifacts
+        ],
         "pagination": {
             "currentPage": page,
             "totalPages": total_pages,
@@ -174,15 +198,16 @@ async def get_all_artifacts(
         },
     }
 
+
 @router.get("/{artifact_id}")
 async def get_artifact(
     artifact_id: str,
     current_user: Optional[User] = Depends(get_optional_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Get artifact by ID"""
     from sqlalchemy.orm import selectinload
-    
+
     result = await db.execute(
         select(Artifact)
         .options(selectinload(Artifact.last_inspector))
@@ -193,11 +218,12 @@ async def get_artifact(
         raise HTTPException(status_code=404, detail="Artifact not found")
     return transform_artifact_response(artifact, current_user)
 
+
 @router.post("/", response_model=dict)
 async def create_artifact(
     artifact_data: ArtifactCreate,
     current_user: User = Depends(require_curator_or_admin),
-        db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Create a new artifact (curator/admin only)"""
     try:
@@ -210,23 +236,26 @@ async def create_artifact(
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Artifact with inventory number {artifact_data.inventory_number} already exists"
+                detail=(
+                    "Artifact with inventory number "
+                    f"{artifact_data.inventory_number} already exists"
+                ),
             )
-        
+
         def map_status_to_backend(frontend_status: Optional[str]) -> str:
             if not frontend_status:
                 return "no_defects"
-            
+
             status_mapping = {
-                'good': 'no_defects',
-                'requires_attention': 'requires_attention',
-                'critical': 'has_defects',
-                'under_restoration': 'under_restoration',
-                'exhibited': 'exhibited'
+                "good": "no_defects",
+                "requires_attention": "requires_attention",
+                "critical": "has_defects",
+                "under_restoration": "under_restoration",
+                "exhibited": "exhibited",
             }
-            
-            return status_mapping.get(frontend_status, 'no_defects')
-        
+
+            return status_mapping.get(frontend_status, "no_defects")
+
         artifact = Artifact(
             title=artifact_data.title,
             description=artifact_data.description,
@@ -237,24 +266,22 @@ async def create_artifact(
             materials=artifact_data.materials,
             image_path=artifact_data.image_path,
             status=map_status_to_backend(artifact_data.status),
-            creation_date=artifact_data.creation_date
+            creation_date=artifact_data.creation_date,
         )
-        
+
         db.add(artifact)
         await db.commit()
         await db.refresh(artifact)
-        
+
         logger.info(f"Created artifact: {artifact.id} - {artifact.title}")
-        
+
         await notify_artifact_created(
-            db=db,
-            artifact_id=artifact.id,
-            artifact_title=artifact.title
+            db=db, artifact_id=artifact.id, artifact_title=artifact.title
         )
         await db.commit()
-        
+
         return transform_artifact_response(artifact, current_user)
-        
+
     except HTTPException:
         await db.rollback()
         raise
@@ -263,7 +290,7 @@ async def create_artifact(
         logger.error(f"Error creating artifact: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create artifact: {str(e)}"
+            detail=f"Failed to create artifact: {str(e)}",
         )
 
 
@@ -272,7 +299,7 @@ async def update_artifact(
     artifact_id: str,
     artifact_data: ArtifactCreate,
     current_user: User = Depends(require_curator_or_admin),
-        db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Update an existing artifact (curator/admin only)"""
     try:
@@ -280,40 +307,44 @@ async def update_artifact(
         artifact = result.scalar_one_or_none()
         if not artifact:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Artifact not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found"
             )
-        
+
         if artifact_data.inventory_number != artifact.inventory_number:
             result = await db.execute(
                 select(Artifact).where(
                     Artifact.inventory_number == artifact_data.inventory_number,
-                    Artifact.id != artifact_id
+                    Artifact.id != artifact_id,
                 )
             )
             existing = result.scalar_one_or_none()
             if existing:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Artifact with inventory number {artifact_data.inventory_number} already exists"
+                    detail=(
+                        "Artifact with inventory number "
+                        f"{artifact_data.inventory_number} already exists"
+                    ),
                 )
-        
-        def map_status_to_backend(frontend_status: Optional[str], current_status: str) -> str:
+
+        def map_status_to_backend(
+            frontend_status: Optional[str], current_status: str
+        ) -> str:
             if not frontend_status:
                 return current_status
-            
+
             status_mapping = {
-                'good': 'no_defects',
-                'requires_attention': 'requires_attention',
-                'critical': 'has_defects',
-                'under_restoration': 'under_restoration',
-                'exhibited': 'exhibited'
+                "good": "no_defects",
+                "requires_attention": "requires_attention",
+                "critical": "has_defects",
+                "under_restoration": "under_restoration",
+                "exhibited": "exhibited",
             }
-            
+
             return status_mapping.get(frontend_status, current_status)
-        
+
         old_status = artifact.status
-        
+
         artifact.title = artifact_data.title
         artifact.description = artifact_data.description
         artifact.inventory_number = artifact_data.inventory_number
@@ -325,7 +356,7 @@ async def update_artifact(
         artifact.status = new_status
         if artifact_data.creation_date is not None:
             artifact.creation_date = artifact_data.creation_date
-        
+
         if artifact_data.image_path:
             if artifact.image_path and artifact.image_path != artifact_data.image_path:
                 try:
@@ -333,25 +364,25 @@ async def update_artifact(
                 except Exception as e:
                     logger.warning(f"Could not delete old image: {e}")
             artifact.image_path = artifact_data.image_path
-        
+
         artifact.updated_at = datetime.now(timezone.utc)
-        
+
         await db.commit()
         await db.refresh(artifact)
-        
+
         if old_status != new_status:
             await notify_artifact_status_changed(
                 db=db,
                 artifact_id=artifact.id,
                 artifact_title=artifact.title,
                 old_status=old_status,
-                new_status=new_status
+                new_status=new_status,
             )
             await db.commit()
-        
+
         logger.info(f"Updated artifact: {artifact.id} - {artifact.title}")
         return transform_artifact_response(artifact, current_user)
-        
+
     except HTTPException:
         await db.rollback()
         raise
@@ -360,7 +391,7 @@ async def update_artifact(
         logger.error(f"Error updating artifact: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update artifact: {str(e)}"
+            detail=f"Failed to update artifact: {str(e)}",
         )
 
 
@@ -368,7 +399,7 @@ async def update_artifact(
 async def delete_artifact(
     artifact_id: str,
     current_user: User = Depends(require_curator_or_admin),
-        db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Delete an artifact (curator/admin only)"""
     try:
@@ -376,22 +407,21 @@ async def delete_artifact(
         artifact = result.scalar_one_or_none()
         if not artifact:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Artifact not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found"
             )
-        
+
         if artifact.image_path:
             try:
                 minio_service.delete_object(artifact.image_path)
             except Exception as e:
                 logger.warning(f"Could not delete image from MinIO: {e}")
-        
+
         await db.delete(artifact)
         await db.commit()
-        
+
         logger.info(f"Deleted artifact: {artifact_id}")
         return {"success": True, "message": "Artifact deleted successfully"}
-        
+
     except HTTPException:
         await db.rollback()
         raise
@@ -400,7 +430,7 @@ async def delete_artifact(
         logger.error(f"Error deleting artifact: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete artifact: {str(e)}"
+            detail=f"Failed to delete artifact: {str(e)}",
         )
 
 
@@ -408,30 +438,29 @@ async def delete_artifact(
 async def inspect_artifact(
     artifact_id: str,
     current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Record artifact inspection (restorers and curators only)"""
     if current_user.role not in ["restorer", "curator", "admin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only restorers and curators can inspect artifacts"
+            detail="Only restorers and curators can inspect artifacts",
         )
-    
+
     result = await db.execute(select(Artifact).where(Artifact.id == artifact_id))
     artifact = result.scalar_one_or_none()
-    
+
     if not artifact:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Artifact not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found"
         )
-    
+
     artifact.last_inspection = datetime.now(timezone.utc)
     artifact.last_inspector_id = current_user.id
     artifact.updated_at = datetime.now(timezone.utc)
-    
+
     await db.commit()
     await db.refresh(artifact)
-    
+
     logger.info(f"Artifact {artifact_id} inspected by {current_user.id}")
     return transform_artifact_response(artifact, current_user)
