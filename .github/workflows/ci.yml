@@ -183,7 +183,16 @@ jobs:
 
       - name: Stop and remove existing containers
         shell: powershell
-        run: docker compose down --remove-orphans
+        run: |
+          docker compose down --remove-orphans
+          $names = @("minio", "artguardian-postgres", "artguardian-backend", "artguardian-frontend", "artguardian-pgadmin", "artguardian-pgbouncer")
+          foreach ($name in $names) {
+            $id = docker ps -aq --filter "name=^/${name}$"
+            if ($id) {
+              Write-Host "Removing container: $name ($id)"
+              docker rm -f $id
+            }
+          }
 
       - name: Start services
         shell: powershell
