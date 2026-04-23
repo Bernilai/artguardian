@@ -18,10 +18,13 @@
     "typescript": "^4.9.5",
     "web-vitals": "^2.1.4"
   },
+  "devDependencies": {
+    "eslint": "^8.57.1"
+  },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "lint": "react-scripts lint --max-warnings 0",
+    "lint": "eslint src --ext .ts,.tsx --max-warnings 0",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

@@ -1,6 +1,5 @@
-[tool.ruff]
 line-length = 88
 exclude = ["tests/", "alembic/"]
 
-[tool.ruff.lint]
+[lint]
 select = ["E", "F", "I"]
