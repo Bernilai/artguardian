@@ -146,6 +146,7 @@ jobs:
     needs:
       - backend-lint-test
       - frontend-lint-test
+      - docker-build-validate
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
