@@ -181,6 +181,10 @@ jobs:
           FRONTEND_PORT=${{ secrets.FRONTEND_PORT }}
           "@ | Set-Content -Path ".env" -Encoding ascii
 
+      - name: Stop and remove existing containers
+        shell: powershell
+        run: docker compose down --remove-orphans
+
       - name: Start services
         shell: powershell
         run: docker compose up -d --build
