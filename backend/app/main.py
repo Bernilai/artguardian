@@ -116,7 +116,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 cors_origins = os.getenv(
-    "CORS_ORIGINS", "http://localhost:80,http://127.0.0.1:80"
+    "CORS_ORIGINS", "http://localhost,http://127.0.0.1"
 ).split(",")
 app.add_middleware(
     CORSMiddleware,

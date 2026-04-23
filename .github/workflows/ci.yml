@@ -132,7 +132,7 @@ jobs:
           MINIO_SECURE=false
           MINIO_REGION=us-east-1
           MINIO_PUBLIC_URL=http://localhost:9000
-          CORS_ORIGINS=http://localhost:3000
+          CORS_ORIGINS=http://localhost,http://127.0.0.1
           BACKEND_PORT=${BACKEND_PORT}
           FRONTEND_PORT=${FRONTEND_PORT}
           EOF
